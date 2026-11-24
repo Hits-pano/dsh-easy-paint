@@ -2,7 +2,9 @@
 
 > 在 [DeepSeek Harness](https://github.com/deepseek-ai) 里用本机 ComfyUI 生成图片的插件
 
-给一段描述，出一张图。给几张参考图，按描述改。全程在本机跑，不联网、不花钱。
+给一段描述，出一张图。给几张参考图，按描述改。生图全程在本机跑，不联网、不产生费用。
+
+唯一的例外：开启「视觉自检」并选用云端 API 模型时，每次出图会多一次模型调用（本地视觉模型则不花钱）。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![DSH Plugin](https://img.shields.io/badge/DeepSeek%20Harness-plugin-blue.svg)]()
