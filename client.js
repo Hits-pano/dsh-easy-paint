@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({
-  id: '@local/qwen-draw-lite',
+  id: 'dsh-qwen-draw-lite',
   factory(require) {
     const React = require('react')
     const h = React.createElement

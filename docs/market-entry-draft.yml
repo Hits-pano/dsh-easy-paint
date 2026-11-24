@@ -1,0 +1,26 @@
+# awesome-dsh-plugin 收录条目草稿
+# 目标文件：data/plugins/Hits-pano__dsh-qwen-draw-lite.yml
+# 提交前一天检查：仓库创建是否满 1 天（本仓库 2026-11-24 创建）
+
+url: https://github.com/Hits-pano/dsh-qwen-draw-lite
+name: Hits-pano/dsh-qwen-draw-lite
+category: tools
+description:
+  en: 'Generates images through a local ComfyUI instance using Qwen models, with text-to-image and reference-image editing.'
+  zh: '通过本机 ComfyUI 调用 Qwen 模型生成图片，支持文生图与参考图编辑。'
+icon: https://raw.githubusercontent.com/Hits-pano/dsh-qwen-draw-lite/main/assets/icon-180.png
+
+# ---- 提交前检查清单 ----
+# [ ] 仓库创建满 1 天（2026-11-24 创建，11-25 之后可提交）
+# [ ] 仓库加 dsh-plugin topic
+# [ ] package.json 有 dsh.bundle（已有）
+# [ ] cordis.patch.yml 在根目录（已有）
+# [ ] 描述与实际功能一致
+#   - "local ComfyUI" ✓（工作流直连 127.0.0.1:8188）
+#   - "Qwen models" ✓（模型兼容性检查 /qwen/i）
+#   - "text-to-image and reference-image editing" ✓（buildWorkflow + buildEditWorkflow）
+# [ ] 一个 PR 只加一个文件
+#
+# ---- 分类说明 ----
+# 选 tools 而不是 workflow：插件本体是一个生图工具（调用 ComfyUI），
+# 不是流程编排或工作流编辑器。
