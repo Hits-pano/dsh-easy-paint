@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Qwen Draw",
+    "description": "A small local image generator backed by ComfyUI and the Qwen models: ships a qwen_draw tool and a native DSH settings section. Independent of dsh-qwen-paint."
+  }
+}

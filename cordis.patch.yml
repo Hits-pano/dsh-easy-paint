@@ -1,0 +1,3 @@
+- insert:
+    - id: qwen-draw
+      name: '@local/qwen-draw'

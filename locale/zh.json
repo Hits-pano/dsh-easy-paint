@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "千问绘图（qwen-draw）",
+    "description": "用本机 ComfyUI 跑千问模型出图的小插件：自带 qwen_draw 工具，设置页是 DSH 原生风格并集成在设置中心，不依赖 dsh-qwen-paint。"
+  }
+}

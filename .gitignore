@@ -1,0 +1,20 @@
+# 依赖
+node_modules/
+
+# DSH 运行时产物
+.dsh/
+
+# 日志
+*.log
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 临时文件
+_*

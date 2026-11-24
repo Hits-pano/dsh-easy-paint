@@ -1,0 +1,46 @@
+{
+  "name": "@local/qwen-draw",
+  "version": "0.1.0",
+  "description": "在 DeepSeek Harness 里用本机 ComfyUI 生成图片的插件，支持文生图与参考图编辑",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "comfyui",
+    "qwen-image",
+    "text-to-image",
+    "image-editing"
+  ],
+  "homepage": "https://github.com/Hits-pano/dsh-qwen-draw#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hits-pano/dsh-qwen-draw.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Hits-pano/dsh-qwen-draw/issues"
+  },
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg"
+  ],
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": ["@deepseek-ai/dsh-client-ui-settings"]
+    }
+  }
+}
