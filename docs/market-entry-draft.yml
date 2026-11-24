@@ -9,6 +9,8 @@ description:
   en: 'Generates images through a local ComfyUI instance using Qwen models, with text-to-image and reference-image editing.'
   zh: '通过本机 ComfyUI 调用 Qwen 模型生成图片，支持文生图与参考图编辑。'
 icon: https://raw.githubusercontent.com/Hits-pano/dsh-qwen-draw-lite/main/assets/icon-180.png
+# 预构建 tarball：资产名故意不带版本号，配合 latest/download 永不失效
+tarball: https://github.com/Hits-pano/dsh-qwen-draw-lite/releases/latest/download/dsh-qwen-draw-lite.tgz
 
 # ---- 提交前检查清单 ----
 # [ ] 仓库创建满 1 天（2026-11-24 创建，11-25 之后可提交）
