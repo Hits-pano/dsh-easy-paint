@@ -94,9 +94,10 @@ window.__ModuleLoader__.load({
       selfCheckHint: '出图后自动检查画面。自检失败只提示，不会丢掉已生成的图。',
       selfCheckOff: '不自检（直接出图）',
       selfCheckLight: '轻量自检（尺寸 + 文件大小）',
-      selfCheckVision: '视觉自检（用模型看图）',
+      selfCheckVision: '视觉自检（用模型看图，可能产生费用）',
       visionModel: '检查用模型',
-      visionModelHint: '只列出 DSH 里声明支持图片输入的模型。',
+      visionModelHint: '只列出 DSH 里声明支持图片输入的模型。本地模型免费，远程 API 模型按调用计费——每出一张图就是一次调用，开自动重试时按张数累加。',
+      visionCostWarning: '⚠ 视觉自检会用下方所选模型真的看一次图。如果选的是云端 API 模型，每张图都会产生一次调用费用；开自动重试时按张数翻倍。用本地模型（Ollama / LM Studio）不花钱。',
       visionModelNone: '没有找到支持图片输入的模型（需在 DSH 的模型配置里声明 input: image）',
       visionModelLoading: '正在读取可用模型…',
       saved: '已保存',
@@ -212,9 +213,10 @@ window.__ModuleLoader__.load({
       selfCheckHint: 'Inspects the generated image afterwards. A failed check only warns; the image is kept.',
       selfCheckOff: 'None (use the image directly)',
       selfCheckLight: 'Light (size + file size)',
-      selfCheckVision: 'Vision (model looks at it)',
+      selfCheckVision: 'Vision (model looks at it — may cost money)',
       visionModel: 'Check model',
-      visionModelHint: 'Lists only models that declare image input in DSH.',
+      visionModelHint: 'Lists only models that declare image input in DSH. Local models are free; remote API models are billed per call — one call per generated image, multiplied when auto-retry is on.',
+      visionCostWarning: '⚠ Vision check really calls the selected model once per image. With a cloud API model this costs money every generation, multiplied by auto-retry count. Local models (Ollama / LM Studio) are free.',
       visionModelNone: 'No image-capable model found (set input: image in the DSH model config)',
       visionModelLoading: 'Loading available models…',
       saved: 'Saved',
@@ -396,6 +398,15 @@ window.__ModuleLoader__.load({
 /* 下拉框禁用时箭头也淡化 */
 .qwd-select:disabled { opacity: .55; }
 .qwd-select-wide { width: 260px; }
+/* 视觉自检的费用警示 */
+.qwd-cost-warn {
+  margin: 2px 0 10px; padding: 8px 10px;
+  font-size: 12px; line-height: 1.6;
+  color: #e0a86c;
+  background: rgba(224, 168, 108, .1);
+  border: 1px solid rgba(224, 168, 108, .3);
+  border-radius: 7px;
+}
 /* 推荐模型清单 */
 .qwd-recommend {
   margin-top: 12px; padding: 10px 12px;
@@ -1059,6 +1070,10 @@ window.__ModuleLoader__.load({
                 h('div', { className: 'qwd-hint' }, loadingVision ? t('visionModelLoading') : t('visionModelNone')),
               ),
             ))
+          : null,
+        // 视觉自检会调用真实模型：云端按次计费，本地免费。必须让用户看见。
+        draft.selfCheck === 'vision'
+          ? h('p', { className: 'qwd-cost-warn' }, t('visionCostWarning'))
           : null,
         ),
 
