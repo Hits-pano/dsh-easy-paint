@@ -1,4 +1,4 @@
-# Qwen Draw
+# Qwen Draw Lite
 
 > 在 [DeepSeek Harness](https://github.com/deepseek-ai) 里用本机 ComfyUI 生成图片的插件
 
@@ -47,7 +47,7 @@
 
 ```bash
 cd <你的 DSH 工作区>
-git clone https://github.com/Hits-pano/dsh-qwen-draw.git
+git clone https://github.com/Hits-pano/dsh-qwen-draw-lite.git
 ```
 
 ### 2. 链接到 DSH profile
@@ -57,14 +57,14 @@ Windows（Junction）：
 ```powershell
 New-Item -ItemType Junction `
   -Path "$env:USERPROFILE\.dsh\profiles\<profile>\node_modules\@local\qwen-draw" `
-  -Target "<你的 DSH 工作区>\dsh-qwen-draw"
+  -Target "<你的 DSH 工作区>\dsh-qwen-draw-lite"
 ```
 
 macOS / Linux（软链接）：
 
 ```bash
-ln -s <你的 DSH 工作区>/dsh-qwen-draw \
-  ~/.dsh/profiles/<profile>/node_modules/@local/qwen-draw
+ln -s <你的 DSH 工作区>/dsh-qwen-draw-lite \
+  ~/.dsh/profiles/<profile>/node_modules/@local/qwen-draw-lite
 ```
 
 ### 3. 在 profile 里启用
@@ -74,7 +74,7 @@ ln -s <你的 DSH 工作区>/dsh-qwen-draw \
 ```yaml
 - insert:
     - id: qwen-draw
-      name: '@local/qwen-draw'
+      name: '@local/qwen-draw-lite'
 ```
 
 ### 4. 重启 DSH

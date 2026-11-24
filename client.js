@@ -1,20 +1,20 @@
 window.__ModuleLoader__.load({
-  id: '@local/qwen-draw',
+  id: '@local/qwen-draw-lite',
   factory(require) {
     const React = require('react')
     const h = React.createElement
     const NS = 'settings.qwenDraw'
 
-    const API_CONFIG = 'api/qwen-draw/config'
-    const API_STATUS = 'api/qwen-draw/status'
-    const API_MODELS = 'api/qwen-draw/models'
-    const API_LAUNCH = 'api/qwen-draw/launch'
-    const API_STOP = 'api/qwen-draw/stop'
-    const API_VISION_MODELS = 'api/qwen-draw/vision-models'
-    const API_DETECT = 'api/qwen-draw/detect'
+    const API_CONFIG = 'api/qwen-draw-lite/config'
+    const API_STATUS = 'api/qwen-draw-lite/status'
+    const API_MODELS = 'api/qwen-draw-lite/models'
+    const API_LAUNCH = 'api/qwen-draw-lite/launch'
+    const API_STOP = 'api/qwen-draw-lite/stop'
+    const API_VISION_MODELS = 'api/qwen-draw-lite/vision-models'
+    const API_DETECT = 'api/qwen-draw-lite/detect'
 
     const zh = {
-      title: 'Qwen Draw',
+      title: 'Qwen Draw Lite',
       lead: '本机 ComfyUI + 千问原生工作点。下面的改动即时保存并立即生效，不用重启。',
       connOnline: 'ComfyUI 在线',
       connOffline: 'ComfyUI 离线',
@@ -133,7 +133,7 @@ window.__ModuleLoader__.load({
       seatTitleZombie: 'ComfyUI 进程卡死（端口被占用但服务无响应），点击强制终止并重启',
     }
     const en = {
-      title: 'Qwen Draw',
+      title: 'Qwen Draw Lite',
       lead: 'Local ComfyUI at the Qwen native working point. Changes save and take effect immediately, no restart needed.',
       connOnline: 'ComfyUI online',
       connOffline: 'ComfyUI offline',
@@ -971,9 +971,36 @@ window.__ModuleLoader__.load({
           ? h('p', { className: 'qwd-hint', style: { margin: '0 0 8px' } }, t('modelStale'))
           : null,
         h('p', { className: 'qwd-hint', style: { margin: '0 0 10px' } }, t('modelFamilyHint')),
-        h(ModelField, { label: t('unet'), hint: t('unetHint'), value: draft.unet ?? '', options: models.unet, disabled, fallbackHint: t('modelFallback'), t, onChange: (v) => { patch('unet', v); void save('unet', null, v) } }),
-        h(ModelField, { label: t('clip'), hint: t('clipHint'), value: draft.clip ?? '', options: models.clip, disabled, fallbackHint: t('modelFallback'), t, onChange: (v) => { patch('clip', v); void save('clip', null, v) } }),
-        h(ModelField, { label: t('vae'), hint: t('vaeHint'), value: draft.vae ?? '', options: models.vae, disabled, fallbackHint: t('modelFallback'), t, onChange: (v) => { patch('vae', v); void save('vae', null, v) } }),
+        h(ModelField, {
+          label: t('unet'),
+          hint: t('unetHint'),
+          value: draft.unet ?? '',
+          options: models.unet,
+          disabled,
+          fallbackHint: t('modelFallback'),
+          t,
+          onChange: (v) => { patch('unet', v); void save('unet', null, v) },
+        }),
+        h(ModelField, {
+          label: t('clip'),
+          hint: t('clipHint'),
+          value: draft.clip ?? '',
+          options: models.clip,
+          disabled,
+          fallbackHint: t('modelFallback'),
+          t,
+          onChange: (v) => { patch('clip', v); void save('clip', null, v) },
+        }),
+        h(ModelField, {
+          label: t('vae'),
+          hint: t('vaeHint'),
+          value: draft.vae ?? '',
+          options: models.vae,
+          disabled,
+          fallbackHint: t('modelFallback'),
+          t,
+          onChange: (v) => { patch('vae', v); void save('vae', null, v) },
+        }),
         // 新用户不知道该装什么模型：列出实测可用的一套，标出本机装了哪些
         recommended
           ? h('div', { className: 'qwd-recommend' },

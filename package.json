@@ -1,5 +1,5 @@
 {
-  "name": "@local/qwen-draw",
+  "name": "@local/qwen-draw-lite",
   "version": "0.1.0",
   "description": "在 DeepSeek Harness 里用本机 ComfyUI 生成图片的插件，支持文生图与参考图编辑",
   "keywords": [
@@ -11,13 +11,13 @@
     "text-to-image",
     "image-editing"
   ],
-  "homepage": "https://github.com/Hits-pano/dsh-qwen-draw#readme",
+  "homepage": "https://github.com/Hits-pano/dsh-qwen-draw-lite#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Hits-pano/dsh-qwen-draw.git"
+    "url": "git+https://github.com/Hits-pano/dsh-qwen-draw-lite.git"
   },
   "bugs": {
-    "url": "https://github.com/Hits-pano/dsh-qwen-draw/issues"
+    "url": "https://github.com/Hits-pano/dsh-qwen-draw-lite/issues"
   },
   "license": "MIT",
   "private": true,

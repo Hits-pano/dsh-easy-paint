@@ -1,5 +1,5 @@
 /**
- * qwen-draw · Host 侧
+ * qwen-draw-lite · Host 侧
  *
  * 直接和本机 ComfyUI 的 HTTP API 打交道，不依赖任何 DSH 内部包
  * （本地插件经 Junction 安装，Node 从工作区解析，找不到 app.asar 里的包）。
@@ -7,8 +7,8 @@
  *
  * 配置分三层，后者覆盖前者：
  *   1. DEFAULTS（本文件常量）
- *   2. cordis.patch.yml 里 qwen-draw.config（部署基线）
- *   3. <home>/.dsh/qwen-draw/config.json（设置页写入，改完立即生效，不用重启）
+ *   2. cordis.patch.yml 里 qwen-draw-lite.config（部署基线）
+ *   3. <home>/.dsh/qwen-draw-lite/config.json（设置页写入，改完立即生效，不用重启）
  */
 import { execFile, spawn } from 'node:child_process'
 import { existsSync, openSync } from 'node:fs'
@@ -17,7 +17,7 @@ import net from 'node:net'
 import { homedir } from 'node:os'
 import { dirname, basename, join } from 'node:path'
 
-export const name = 'qwen-draw'
+export const name = 'qwen-draw-lite'
 export const inject = ['tools']
 
 /** 画幅 → 像素。边长均为 16 的倍数，总像素贴近 1MP。 */
@@ -77,16 +77,16 @@ const DEFAULTS = {
   selfCheckModel: '/models/Qwen3-Omni-30B-A3B-Instruct',
 }
 
-const COMFY_LOG = join(homedir(), '.dsh', 'qwen-draw', 'comfyui.log')
+const COMFY_LOG = join(homedir(), '.dsh', 'qwen-draw-lite', 'comfyui.log')
 
-const CONFIG_PATH = '/api/qwen-draw/config'
-const STATUS_PATH = '/api/qwen-draw/status'
-const MODELS_PATH = '/api/qwen-draw/models'
-const LAUNCH_PATH = '/api/qwen-draw/launch'
-const STOP_PATH = '/api/qwen-draw/stop'
-const VISION_MODELS_PATH = '/api/qwen-draw/vision-models'
-const DETECT_PATH = '/api/qwen-draw/detect'
-const STATE_DIR = join(homedir(), '.dsh', 'qwen-draw')
+const CONFIG_PATH = '/api/qwen-draw-lite/config'
+const STATUS_PATH = '/api/qwen-draw-lite/status'
+const MODELS_PATH = '/api/qwen-draw-lite/models'
+const LAUNCH_PATH = '/api/qwen-draw-lite/launch'
+const STOP_PATH = '/api/qwen-draw-lite/stop'
+const VISION_MODELS_PATH = '/api/qwen-draw-lite/vision-models'
+const DETECT_PATH = '/api/qwen-draw-lite/detect'
+const STATE_DIR = join(homedir(), '.dsh', 'qwen-draw-lite')
 const STATE_FILE = join(STATE_DIR, 'config.json')
 // 模型列表缓存：ComfyUI 关着时设置页仍然有下拉可选，不用逼用户手打文件名
 const MODELS_CACHE_FILE = join(STATE_DIR, 'models-cache.json')
@@ -214,7 +214,7 @@ async function visionCheck(services, buffer, prompt, cfg) {
 
   let ref
   try {
-    const refs = await store.saveImages([{ data: buffer, mediaType: 'image/png', name: 'qwen-draw-selfcheck.png' }])
+    const refs = await store.saveImages([{ data: buffer, mediaType: 'image/png', name: 'qwen-draw-lite-selfcheck.png' }])
     ref = refs[0]
   } catch (error) {
     return { mode: 'vision', ok: true, skipped: true, issues: [`图片存入附件失败：${error?.message ?? error}`] }
@@ -520,7 +520,7 @@ function buildEditWorkflow(cfg, args, imageNames) {
       },
     },
     8: { class_type: 'VAEDecode', inputs: { samples: ['7', 0], vae: ['3', 0] } },
-    9: { class_type: 'SaveImage', inputs: { images: ['8', 0], filename_prefix: 'qwen-draw-edit' } },
+    9: { class_type: 'SaveImage', inputs: { images: ['8', 0], filename_prefix: 'qwen-draw-lite-edit' } },
   }
 
   // 每张参考图挂一个 LoadImage，接进 TextEncodeQwenImageEditPlus 的 imageN
@@ -576,7 +576,7 @@ function buildWorkflow(cfg, args) {
         },
       },
       8: { class_type: 'VAEDecode', inputs: { samples: ['7', 0], vae: ['3', 0] } },
-      9: { class_type: 'SaveImage', inputs: { images: ['8', 0], filename_prefix: 'qwen-draw' } },
+      9: { class_type: 'SaveImage', inputs: { images: ['8', 0], filename_prefix: 'qwen-draw-lite' } },
     },
   }
 }
@@ -875,7 +875,7 @@ async function ensureComfy(cfg) {
 }
 
 async function runWorkflow(baseUrl, prompt, { timeoutMs, signal }) {
-  const clientId = `qwen-draw-${Date.now()}`
+  const clientId = `qwen-draw-lite-${Date.now()}`
   const res = await comfyFetch(`${baseUrl}/prompt`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -934,7 +934,7 @@ async function saveImage(baseUrl, image, outputDir) {
   const buffer = Buffer.from(await res.arrayBuffer())
   await mkdir(outputDir, { recursive: true })
   const stamp = new Date().toISOString().replace(/[:.]/gu, '-').slice(0, 19)
-  const file = join(outputDir, `qwen-draw-${stamp}-${image.filename ?? 'out.png'}`)
+  const file = join(outputDir, `qwen-draw-lite-${stamp}-${image.filename ?? 'out.png'}`)
   await writeFile(file, buffer)
   return file
 }
@@ -1043,7 +1043,24 @@ export function apply(ctx, rawConfig) {
           selfCheckSeconds: { type: 'number' },
           ignoredArgs: { type: 'array', items: { type: 'string' } },
         },
-        required: ['path', 'paths', 'seeds', 'checks', 'width', 'height', 'steps', 'cfg', 'seed', 'seconds', 'startupSeconds', 'refCount', 'ignoredRefs', 'selfCheck', 'selfCheckSeconds', 'ignoredArgs'],
+        required: [
+        'path',
+        'paths',
+        'seeds',
+        'checks',
+        'width',
+        'height',
+        'steps',
+        'cfg',
+        'seed',
+        'seconds',
+        'startupSeconds',
+        'refCount',
+        'ignoredRefs',
+        'selfCheck',
+        'selfCheckSeconds',
+        'ignoredArgs',
+      ],
       },
       render: (_args, value) => {
         // 启动耗时为 0 时不提，避免每次都多一句废话
@@ -1657,7 +1674,7 @@ export function apply(ctx, rawConfig) {
           webCtx.webServer.register({ kind: 'exact', path: DETECT_PATH, handler: onDetect }),
         ]
         return () => { for (const dispose of disposers) dispose() }
-      }, 'qwen-draw: config, status, models, launch, stop and vision-models routes')
+      }, 'qwen-draw-lite: config, status, models, launch, stop and vision-models routes')
     })
   }
 }
