@@ -18,7 +18,6 @@ window.__ModuleLoader__.load({
       lead: '通过本机 ComfyUI 出图，支持切换模型架构。',
       connOnline: 'ComfyUI 在线',
       connOffline: 'ComfyUI 离线',
-      recheck: '重新检测',
       endpoint: '地址',
       autoStart: '连不上时自动启动',
       autoStartHint: '出图前先探活；连不上就用下面的 python 把 ComfyUI 拉起来，再提交任务。',
@@ -31,7 +30,6 @@ window.__ModuleLoader__.load({
       modelsDirHint: '填 models 目录本身，留空则用「工作目录/models」。填了可以不启动 ComfyUI 直接读模型列表。',
       comfyWorkdirHint: '留空则用 main.py 所在目录。',
       seatStarting: '启动中…',
-      models: '模型文件',
       archLabel: '模型架构',
       archHint: '决定用哪套 ComfyUI 工作流。换架构后要重新选模型，采样参数默认值也不同。',
       archQwen: 'Qwen-Image',
@@ -42,13 +40,6 @@ window.__ModuleLoader__.load({
       sdxlStepsHint: 'SDXL 通常 25–30 步。太少会糊，再多收益递减。',
       sdxlCfgHint: 'SDXL 通常 7–8。低于 5 出图会发灰、不跟提示词。',
       sdxlEditDenoiseHint: '0.6–0.75 保留原图结构；1.0 等于整图重画。',
-      sdxlRecTitle: '常见 SDXL 模型',
-      sdxlRecBase: '官方基准，最稳，适合先跑通链路',
-      sdxlRecReal: '写实向，人像和场景光影质量高',
-      sdxlRecAnime: '动漫向，提示词写法和普通 SDXL 一样',
-      sdxlRecHint: '放进 models/checkpoints 后点上面的「刷新模型列表」。',
-      copyModelHint: '点击复制模型名',
-      copyModelDone: '模型名已复制',
       unet: '主模型',
       unetHint: 'models/diffusion_models 下的文件名。',
       clip: '文本编码器',
@@ -81,7 +72,8 @@ window.__ModuleLoader__.load({
       foldQwenHint: 'Qwen-Image 的主模型、文本编码器、VAE',
       foldZImage: 'Z-Image 设置',
       foldZImageHint: 'Z-Image-Turbo 分离式三件套（diffusion_models + text_encoders + vae）',
-      zimageNote: 'Z-Image 的文本编码器和 VAE 和 Qwen 不是同一套文件，不能混用。Turbo 版只支持文生图，8 步出图。',
+      zimageNote: '三件套和 Qwen 不通用，别混用。',
+      zimageRecHint: '放进对应目录后点上面的「刷新模型列表」即可识别。主模型有三个量化版本：int8（5.8 GB，已验证）、bf16（11.5 GB，画质最好但显存吃紧）、nvfp4（4.2 GB，需 RTX 50 系）——放进 diffusion_models 就会自动出现在下拉里。',
       zimagePositiveHint: '留空即可。Z-Image 不需要质量标签，用自然语言描述，它会推理；中英文文字渲染是强项。',
       zimageStepsHint: 'Z-Image-Turbo 推荐 8 步（蒸馏模型，再多也没提升）。',
       zimageCfgHint: 'Z-Image-Turbo 固定 1.0。调高会让负面词生效，但容易过曝。',
@@ -91,8 +83,6 @@ window.__ModuleLoader__.load({
       foldSdxlHint: 'SDXL 单文件 checkpoint（models/checkpoints）',
       foldParams: '生图参数设置',
       foldParamsHint: '画幅、重试、负面词、出图自检',
-      foldAdvanced: '高级设置',
-      foldAdvancedHint: '采样步数、CFG、重绘强度、参考图上限',
       foldAppearance: '外观设置',
       foldAppearanceHint: '对话框状态按钮',
       showStatusSeat: '对话框显示 ComfyUI 状态',
@@ -104,22 +94,13 @@ window.__ModuleLoader__.load({
       cfg: '提示词引导 CFG',
       cfgHint: '提示词引导强度。turbo 模型建议 1.0——实测 2.5 时连续图生图会逐轮过曝（3 轮纯白占比 0.18%→17.6%），1.0 下完全稳定且更快。',
       size: '默认画幅',
-      negative: '默认负面词',
       positivePrompt: '默认正面提示词',
       positivePromptHint: '出图时拼在你的描述前面。留空则只用你自己的描述。',
       negativePrompt: '默认负面提示词',
       negativePromptHint: '出图时作为 negative 送进去，用来压制不想要的东西。',
       sdxlPositiveHint: 'SDXL 系模型常用 masterpiece, best quality 这类质量词。留空则只用你自己的描述。',
       sdxlNegativeHint: '出图时作为 negative 送进去，用来压制不想要的东西。',
-      loraTitle: 'LoRA（可选，最多 5 个）',
-      loraHint: '按顺序串进工作流。权重 0.6–1.0 常见，超过 1 可能过拟合。',
-      loraAdd: '添加 LoRA',
-      loraPick: '选择 LoRA 文件',
-      loraEmpty: '还没有添加 LoRA。',
-      loraRemove: '移除这一条',
       loraSlotEmpty: '（空）',
-      loraRowHint: '留空即不用',
-      loraRowNote: '（留空不使用）',
       loraLoaded: '已装载',
       loraIncompatible: '不兼容，LoRA 未生效',
       loraCross: '跨系 LoRA，效果可能不佳',
@@ -129,13 +110,11 @@ window.__ModuleLoader__.load({
       loraMissing: '文件已失效',
       loraMissingTitle: '配置里记的这个文件名在 models/loras 下已经找不到了（可能被改名或删除）。请重新选一个，或把它从槽位里清掉。',
       loraNoCkptTitle: '先在上面选一个 Checkpoint，才能判断这个 LoRA 是否同系',
-      loraMismatch: '⚠ 和 Checkpoint 不同系',
       loraSd15Warn: '⚠ 这是 SD1.5 的 LoRA，SDXL 用不了',
       loraMismatchTitle: '这个 LoRA 是为 {lora} 训练的，当前 Checkpoint 属于 {cp}。混用效果会打折。',
       loraStrengthHint: '权重 0–2，0.8 常用',
       outputDir: '输出目录',
       outputDirHint: '留空则用 桌面\\千问绘图。',
-      machine: '本机参数',
       gpu: '显卡',
       vram: '显存',
       maxRefImagesOver: '⚠ 超出硬件能力上限：本机只能安全处理 {n} 张，填再多也会被压回 {n} 张；硬上更会撑爆显存卡死任务。',
@@ -202,7 +181,6 @@ window.__ModuleLoader__.load({
       lead: 'Generates images through a local ComfyUI instance, with switchable model architectures.',
       connOnline: 'ComfyUI online',
       connOffline: 'ComfyUI offline',
-      recheck: 'Recheck',
       endpoint: 'Endpoint',
       autoStart: 'Start it when unreachable',
       autoStartHint: 'Probes before drawing; starts ComfyUI with the python below when it is down.',
@@ -215,7 +193,6 @@ window.__ModuleLoader__.load({
       modelsDirHint: 'Point at the models folder itself. Empty means <working dir>/models. When set, the model list is read straight from disk without ComfyUI running.',
       comfyWorkdirHint: 'Empty uses the main.py directory.',
       seatStarting: 'Starting…',
-      models: 'Model files',
       archLabel: 'Architecture',
       archHint: 'Decides which ComfyUI workflow is used. Switching architecture means re-picking models; sampling defaults differ too.',
       archQwen: 'Qwen-Image',
@@ -226,13 +203,6 @@ window.__ModuleLoader__.load({
       sdxlStepsHint: 'SDXL usually wants 25–30 steps. Too few looks mushy; beyond that returns diminish.',
       sdxlCfgHint: 'SDXL usually 7–8. Below 5 the image goes flat and ignores the prompt.',
       sdxlEditDenoiseHint: '0.6–0.75 keeps the original structure; 1.0 repaints the whole image.',
-      sdxlRecTitle: 'Common SDXL models',
-      sdxlRecBase: 'Official baseline, most reliable, good first choice',
-      sdxlRecReal: 'Photorealistic, strong on portraits and scene lighting',
-      sdxlRecAnime: 'Anime focused, prompt style same as regular SDXL',
-      sdxlRecHint: 'Drop the file into models/checkpoints, then hit Refresh above.',
-      copyModelHint: 'Click to copy the model name',
-      copyModelDone: 'Model name copied',
       unet: 'Diffusion model',
       unetHint: 'File name under models/diffusion_models.',
       clip: 'Text encoder',
@@ -265,7 +235,8 @@ window.__ModuleLoader__.load({
       foldQwenHint: 'Qwen-Image diffusion model, text encoder and VAE',
       foldZImage: 'Z-Image',
       foldZImageHint: 'Z-Image-Turbo split files (diffusion_models + text_encoders + vae)',
-      zimageNote: 'Z-Image uses a different text encoder and VAE than Qwen — do not mix them. The Turbo variant is text-to-image only, 8 steps.',
+      zimageNote: 'These files are not interchangeable with Qwen.',
+      zimageRecHint: 'Put the files in the folders above, then hit "Reload models". The main model comes in three quantizations: int8 (5.8 GB, verified), bf16 (11.5 GB, best quality but heavy), nvfp4 (4.2 GB, needs RTX 50 series) — drop one into diffusion_models and it shows up in the dropdown automatically.',
       zimagePositiveHint: 'Leave empty. Z-Image needs no quality tags; describe naturally and it reasons. Strong at rendering Chinese and English text.',
       zimageStepsHint: 'Z-Image-Turbo recommends 8 steps (distilled model, more gains little).',
       zimageCfgHint: 'Fixed at 1.0 for Z-Image-Turbo. Raising it makes negatives apply but tends to blow out highlights.',
@@ -275,8 +246,6 @@ window.__ModuleLoader__.load({
       foldSdxlHint: 'SDXL single-file checkpoint (models/checkpoints)',
       foldParams: 'Generation',
       foldParamsHint: 'Size, retries, negative prompt, post-check',
-      foldAdvanced: 'Advanced',
-      foldAdvancedHint: 'Steps, CFG, edit strength, reference cap',
       foldAppearance: 'Appearance',
       foldAppearanceHint: 'Composer status chip',
       showStatusSeat: 'Show status chip in composer',
@@ -294,15 +263,7 @@ window.__ModuleLoader__.load({
       negativePromptHint: 'Sent as the negative prompt to suppress what you do not want.',
       sdxlPositiveHint: 'SDXL-family models often use quality words like masterpiece, best quality. Leave empty to use only your description.',
       sdxlNegativeHint: 'Sent as the negative prompt to suppress what you do not want.',
-      loraTitle: 'LoRA (optional, up to 5)',
-      loraHint: 'Chained into the workflow in order. Weights of 0.6–1.0 are typical; above 1 may overfit.',
-      loraAdd: 'Add LoRA',
-      loraPick: 'Pick a LoRA file',
-      loraEmpty: 'No LoRA added yet.',
-      loraRemove: 'Remove this entry',
       loraSlotEmpty: '(empty)',
-      loraRowHint: 'Leave empty to skip',
-      loraRowNote: '(leave empty to skip)',
       loraLoaded: 'Loaded',
       loraIncompatible: 'Incompatible, LoRA not applied',
       loraCross: 'Cross-base LoRA, may look worse',
@@ -312,13 +273,11 @@ window.__ModuleLoader__.load({
       loraMissing: 'File missing',
       loraMissingTitle: 'The file recorded in config no longer exists under models/loras (renamed or deleted). Pick another one or clear this slot.',
       loraNoCkptTitle: 'Pick a Checkpoint above first, then compatibility can be judged',
-      loraMismatch: '⚠ different base than Checkpoint',
       loraSd15Warn: '⚠ SD1.5 LoRA, unusable on SDXL',
       loraMismatchTitle: 'This LoRA was trained for {lora}, but the current Checkpoint is {cp}. Mixing them weakens the effect.',
       loraStrengthHint: 'Weight 0-2, 0.8 is typical',
       outputDir: 'Output directory',
       outputDirHint: 'Empty uses Desktop\\千问绘图.',
-      machine: 'Machine',
       gpu: 'GPU',
       vram: 'VRAM',
       maxRefImagesOver: '⚠ Above hardware limit: only {n} can be handled safely; higher values are clamped to {n} and risk VRAM exhaustion.',
@@ -604,6 +563,17 @@ window.__ModuleLoader__.load({
   box-shadow: inset 0 1px 0 rgba(128, 128, 128, .12);
 }
 .qwd-fold-body .qwd-group { border-bottom: none; }
+/* 折叠面板头部和「可复制模型名」都是 div 模拟的按钮。
+   不定义 :focus-visible 时，按 Shift 进入键盘导航模式会套浏览器默认的黑色焦点框，
+   和整体配色冲突。这里统一成和输入框一致的蓝色描边。
+   用 outline-offset 负值让描边画在元素内侧，不会撑破圆角。 */
+.qwd-fold-head:focus-visible {
+  outline: 2px solid var(--dsw-alias-accent, #4a7bd0);
+  outline-offset: -2px;
+  border-radius: 8px;
+}
+/* 鼠标点击不要出现焦点框，只有键盘导航才显示 */
+.qwd-fold-head:focus:not(:focus-visible) { outline: none; }
 /* 机器信息：只读检测结果，固定在最后，不折叠 */
 .qwd-machine { margin-top: 18px; padding-top: 6px; border-top: 1px dashed rgba(128, 128, 128, .2); }
 .qwd-field-text { min-width: 0; flex: 1 1 auto; }
@@ -717,20 +687,6 @@ window.__ModuleLoader__.load({
   white-space: normal;
   word-break: break-word;
   color: var(--dsw-alias-text-primary, #ededed);
-}
-/* 可点击复制的模型名：指针 + hover 变色，复制后短暂变绿 */
-/* SDXL 表格：模型名比 Qwen 的类型名长，第一列单独加宽且强制单行 */
-.qwd-recommend-table-sdxl th:nth-child(1),
-.qwd-recommend-table-sdxl td:nth-child(1) { width: 136px; }
-.qwd-recommend-table-sdxl .qwd-recommend-kind { white-space: nowrap; }
-
-.qwd-copyable {
-  cursor: pointer;
-  transition: color .15s, background .15s;
-}
-.qwd-copyable:hover {
-  color: var(--dsw-alias-accent-primary, #6ba4ff);
-  background: rgba(107, 164, 255, .08);
 }
 .qwd-recommend-file {
   overflow: hidden;
@@ -900,6 +856,15 @@ window.__ModuleLoader__.load({
       )
     }
 
+    /**
+     * Z-Image 面板的模型下拉要排除 Qwen-Image 专属的文件。
+     * 用排除法而不是白名单：以后新增的其它模型（Flux、SD3 等）也不会被误藏。
+     * 注意不能笼统排除 "qwen" —— Z-Image 的文本编码器就叫 qwen_3_4b。
+     */
+    function excludeQwenImage(list) {
+      return (list ?? []).filter((f) => !/^qwen_image|^qwen3vl/i.test(f))
+    }
+
     function ModelField(props) {
       const { label, hint, value, options, onChange, disabled, fallbackHint, t, compatiblePattern } = props
       const list = Array.isArray(options) ? options : []
@@ -963,22 +928,6 @@ window.__ModuleLoader__.load({
       const [customRoot, setCustomRoot] = React.useState('')
       const [customCandidates, setCustomCandidates] = React.useState(null)
       // 刚复制过的模型名（「已复制」提示，1.5 秒后自动消失）
-      const [copiedName, setCopiedName] = React.useState('')
-      const copiedTimer = React.useRef(null)
-
-      /** 复制推荐模型名到剪贴板，并短暂显示「已复制」 */
-      const copyModelName = React.useCallback(async (name) => {
-        try {
-          await navigator.clipboard.writeText(name)
-          setCopiedName(name)
-          if (copiedTimer.current !== null) window.clearTimeout(copiedTimer.current)
-          copiedTimer.current = window.setTimeout(() => setCopiedName(''), 1500)
-        } catch {
-          setMessage(`复制失败：${name}`)
-        }
-        return null
-      }, [])
-
       /** 把某个候选写进配置 */
       const applyCandidate = React.useCallback(async (candidate) => {
         patch('comfyWorkdir', candidate.workdir)
@@ -1054,6 +1003,7 @@ window.__ModuleLoader__.load({
       const [refreshingModels, setRefreshingModels] = React.useState(false)
       // Host 下发的推荐模型清单（新用户不知道该装什么时看这里）
       const [recommended, setRecommended] = React.useState(null)
+      const [recommendedZImage, setRecommendedZImage] = React.useState(null)
 
       // 模型候选来自 ComfyUI 的加载器节点，和磁盘实际文件保持一致。
       // ComfyUI 离线时 Host 会返回上次缓存的列表（stale），照样能选。
@@ -1061,6 +1011,7 @@ window.__ModuleLoader__.load({
         try {
           const data = await apiGet(API_MODELS)
           if (data?.recommended) setRecommended(data.recommended)
+          if (data?.recommendedZImage) setRecommendedZImage(data.recommendedZImage)
           if (data?.ok) {
             setModels({
             unet: data.unet ?? [],
@@ -1621,40 +1572,6 @@ window.__ModuleLoader__.load({
           }, refreshingModels ? t('reloading') : t('reload')),
         ),
 
-        // 常见 SDXL 模型表格：按文件名模糊匹配判断装没装
-        h('div', { className: 'qwd-recommend' },
-          h('div', { className: 'qwd-recommend-head' },
-            h('span', null, t('sdxlRecTitle')),
-          ),
-          h('table', { className: 'qwd-recommend-table qwd-recommend-table-sdxl' },
-            h('thead', null,
-              h('tr', null,
-                h('th', null, t('recColKind')),
-                h('th', null, t('recColFile')),
-                h('th', null, t('recColStatus')),
-              ),
-            ),
-            h('tbody', null,
-              SDXL_MODELS.map((m) => {
-                const installed = (models.checkpoints ?? []).some((f) => m.match.test(f))
-                return h('tr', { key: m.key, title: m.name },
-                  h('td', {
-                    className: 'qwd-recommend-kind qwd-copyable',
-                    title: t('copyModelHint'),
-                    role: 'button',
-                    onClick: () => { void copyModelName(m.name) },
-                  }, copiedName === m.name ? t('copyModelDone') : m.name),
-                  h('td', { className: 'qwd-recommend-file' }, t(m.descKey)),
-                  h('td', null, h('span', {
-                    className: `qwd-recommend-tag${installed ? ' qwd-tag-ok' : ' qwd-tag-miss'}`,
-                  }, installed ? t('recInstalled') : t('recMissing'))),
-                )
-              }),
-            ),
-          ),
-          h('p', { className: 'qwd-hint', style: { margin: '8px 0 0' } }, t('sdxlRecHint')),
-        ),
-
         h(ModelField, {
           label: t('checkpoint'),
           hint: t('checkpointHint'),
@@ -1817,11 +1734,47 @@ window.__ModuleLoader__.load({
         ),
         h('p', { className: 'qwd-hint', style: { margin: '0 0 10px' } }, t('zimageNote')),
 
+        // 推荐模型表格：和 Qwen 面板同一套结构，只是数据换成 Z-Image 的三件套
+        recommendedZImage
+          ? h('div', { className: 'qwd-recommend' },
+            h('div', { className: 'qwd-recommend-head' },
+              h('span', null, t('recTitle')),
+            ),
+            h('table', { className: 'qwd-recommend-table' },
+              h('thead', null,
+                h('tr', null,
+                  h('th', null, t('recColKind')),
+                  h('th', null, t('recColFile')),
+                  h('th', null, t('recColStatus')),
+                ),
+              ),
+              h('tbody', null,
+                ['unet', 'clip', 'vae'].map((kind) => {
+                  const rec = recommendedZImage[kind]
+                  if (!rec) return null
+                  const installed = (models[kind] ?? []).includes(rec.file)
+                  return h('tr', {
+                    key: kind,
+                    title: `${rec.label}\n放到 ${rec.dir}\n${rec.note}`,
+                  },
+                  h('td', { className: 'qwd-recommend-kind' }, t(kind)),
+                  h('td', { className: 'qwd-recommend-file' }, rec.file),
+                  h('td', null, h('span', {
+                    className: `qwd-recommend-tag${installed ? ' qwd-tag-ok' : ' qwd-tag-miss'}`,
+                  }, installed ? t('recInstalled') : t('recMissing'))),
+                  )
+                }),
+              ),
+            ),
+            h('p', { className: 'qwd-hint', style: { margin: '8px 0 0' } }, t('zimageRecHint')),
+          )
+          : null,
+
         h(ModelField, {
           label: t('unet'),
           hint: t('unetHint'),
           value: draft.zImageUnet ?? '',
-          options: models.unet,
+          options: excludeQwenImage(models.unet),
           disabled,
           fallbackHint: t('modelFallback'), compatiblePattern: /z_image|zimage/iu,
           t,
@@ -1831,7 +1784,7 @@ window.__ModuleLoader__.load({
           label: t('clip'),
           hint: t('clipHint'),
           value: draft.zImageClip ?? '',
-          options: models.clip,
+          options: excludeQwenImage(models.clip),
           disabled,
           fallbackHint: t('modelFallback'), compatiblePattern: /qwen_3_4b/iu,
           t,
@@ -1841,7 +1794,7 @@ window.__ModuleLoader__.load({
           label: t('vae'),
           hint: t('vaeHint'),
           value: draft.zImageVae ?? '',
-          options: models.vae,
+          options: excludeQwenImage(models.vae),
           disabled,
           fallbackHint: t('modelFallback'),
           t,
@@ -1933,13 +1886,6 @@ const PANEL_FIELDS = {
   zimage: ['zImageUnet', 'zImageClip', 'zImageVae', 'zImagePositive', 'zImageNegative', 'zImageSteps', 'zImageCfg', 'zImageEditDenoise'],
   appearance: ['showStatusSeat'],
 }
-
-/* 常见 SDXL 模型清单：match 用文件名模糊匹配判断装没装 */
-const SDXL_MODELS = [
-  { key: 'illustrious', name: 'Illustrious XL', descKey: 'sdxlRecAnime', match: /illustrious/i },
-  { key: 'juggernaut', name: 'Juggernaut XL', descKey: 'sdxlRecReal', match: /juggernaut/i },
-  { key: 'sdxlBase', name: 'SDXL Base 1.0', descKey: 'sdxlRecBase', match: /sd_?xl[._-]?base|sd_xl_base/i },
-]
 
 const SEAT_STYLE = `
 .qwd-seat {

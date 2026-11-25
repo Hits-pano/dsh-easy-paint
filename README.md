@@ -65,7 +65,7 @@ Qwen-Image 的主模型、文本编码器、VAE。带推荐模型表格，标出
 
 ### Z-Image 设置
 
-Z-Image-Turbo 分离式三件套。注意文本编码器和 VAE 和 Qwen 不是同一套文件。
+Z-Image-Turbo 分离式三件套。带推荐模型表格，标出本机装了哪些；注意文本编码器和 VAE 和 Qwen 不是同一套文件。
 
 <img src="./docs/settings-zimage.png" width="620" alt="Z-Image 设置">
 
@@ -315,7 +315,7 @@ Checkpoint、5 个 LoRA 槽、采样参数、提示词、重绘强度。
 
 ### Z-Image 设置
 
-diffusion 模型、文本编码器、VAE、采样参数、提示词、重绘强度。
+diffusion 模型、文本编码器、VAE（带推荐模型表格）、采样参数、提示词、重绘强度。
 
 ### 外观设置
 

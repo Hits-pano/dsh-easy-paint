@@ -473,6 +473,27 @@ async function detectInCustomRoot(root) {
  * 新用户不知道该装什么模型，这里给出经过实测的一套。
  * 插件不下载、不校验哈希，只负责在设置页提示缺哪个文件。
  */
+const RECOMMENDED_ZIMAGE = {
+  unet: {
+    file: 'z_image_turbo_int8_convrot.safetensors',
+    dir: 'models/diffusion_models',
+    label: 'Z-Image-Turbo · int8',
+    note: '8 步蒸馏版，8 GB 显存实测约 18 秒一张。显存更紧张可换 nvfp4（4.2 GB）。',
+  },
+  clip: {
+    file: 'qwen_3_4b_fp8_mixed.safetensors',
+    dir: 'models/text_encoders',
+    label: 'Qwen3-4B · fp8',
+    note: '和 Qwen-Image 用的 qwen3vl_8b 不是同一个文件，别混用。',
+  },
+  vae: {
+    file: 'ae.safetensors',
+    dir: 'models/vae',
+    label: 'AE · Flux 系 VAE',
+    note: '和 Qwen-Image 的 VAE 不通用。',
+  },
+}
+
 const RECOMMENDED_MODELS = {
   unet: {
     file: 'qwen_image_2.1_turbo_int8_convrot.safetensors',
@@ -493,6 +514,12 @@ const RECOMMENDED_MODELS = {
     note: '解码器，负责把 latent 变成图片。',
   },
 }
+
+/** models 端点统一回传的推荐数据（两套架构的推荐清单） */
+const RECOMMENDED_ALL = () => ({
+  recommended: RECOMMENDED_MODELS,
+  recommendedZImage: RECOMMENDED_ZIMAGE,
+})
 
 /* ------------------------------------------------------------- ComfyUI 侧 ---- */
 
@@ -957,6 +984,41 @@ function zImageNegText(cfg) {
 }
 
 /**
+ * Z-Image 文生图和图生图共用的加载链。
+ * 返回 1–5 号节点（UNET / CLIP / VAE / 正向编码 / AuraFlow）和是否要用真实负面词。
+ * CFG=1 时负面条件完全不参与计算，用 ConditioningZeroOut 能省掉一次文本编码；
+ * 用户把 CFG 调高时才有必要走真正的负面词编码。
+ */
+function zImageBaseNodes(cfg, args, cfgScale) {
+  const nodes = {
+    1: { class_type: 'UNETLoader', inputs: { unet_name: cfg.zImageUnet, weight_dtype: 'default' } },
+    2: {
+      class_type: 'CLIPLoader',
+      inputs: { clip_name: cfg.zImageClip, type: 'lumina2', device: 'default' },
+    },
+    3: { class_type: 'VAELoader', inputs: { vae_name: cfg.zImageVae } },
+    4: { class_type: 'CLIPTextEncode', inputs: { clip: ['2', 0], text: zImagePosText(cfg, args) } },
+    // ModelSamplingAuraFlow 夹在 UNET 和 KSampler 之间，shift 固定 3（官方就是 3）
+    5: { class_type: 'ModelSamplingAuraFlow', inputs: { model: ['1', 0], shift: 3 } },
+  }
+  return { nodes, useRealNegative: cfgScale > 1 }
+}
+
+/**
+ * 把负面条件节点挂进工作流，返回 KSampler 该连的 [id, slot]。
+ * @param prompt 工作流对象（会就地写入新节点）
+ * @param id 负面条件节点要用的编号
+ */
+function attachZImageNegative(prompt, cfg, useRealNegative, id) {
+  const nodeId = String(id)
+  if (useRealNegative) {
+    prompt[nodeId] = { class_type: 'CLIPTextEncode', inputs: { clip: ['2', 0], text: zImageNegText(cfg) } }
+  } else {
+    prompt[nodeId] = { class_type: 'ConditioningZeroOut', inputs: { conditioning: ['4', 0] } }
+  }
+  return [nodeId, 0]
+}
+/**
  * Z-Image-Turbo 文生图。
  * 结构接近 Qwen（分离式三件套 + EmptySD3LatentImage），但有三处不同：
  *   1. CLIPLoader 的 type 是 'lumina2'（不是 'qwen_image'）
@@ -969,44 +1031,32 @@ function buildZImageWorkflow(cfg, args) {
   const steps = clampNumber(cfg.zImageSteps, 8, 1, 30, true)
   const cfgScale = clampNumber(cfg.zImageCfg, 1, 1, 8)
   const seed = resolveSeed(args)
-  // CFG=1 时负面条件完全不参与计算，用 ConditioningZeroOut 省掉一次文本编码；
-  // 用户把 CFG 调高时才有必要走真正的负面词编码。
-  const useRealNegative = cfgScale > 1
 
-  const prompt = {
-    1: { class_type: 'UNETLoader', inputs: { unet_name: cfg.zImageUnet, weight_dtype: 'default' } },
-    2: {
-      class_type: 'CLIPLoader',
-      inputs: { clip_name: cfg.zImageClip, type: 'lumina2', device: 'default' },
+  const { nodes, useRealNegative } = zImageBaseNodes(cfg, args, cfgScale)
+  const prompt = { ...nodes }
+  // 负面条件挂在 10 号，KSampler 自占 7 号
+  const negative = attachZImageNegative(prompt, cfg, useRealNegative, 10)
+
+  prompt[6] = { class_type: 'EmptySD3LatentImage', inputs: { width, height, batch_size: 1 } }
+  prompt[7] = {
+    class_type: 'KSampler',
+    inputs: {
+      model: ['5', 0],
+      positive: ['4', 0],
+      negative,
+      latent_image: ['6', 0],
+      seed,
+      steps,
+      cfg: cfgScale,
+      sampler_name: 'res_multistep',
+      scheduler: 'simple',
+      denoise: 1,
     },
-    3: { class_type: 'VAELoader', inputs: { vae_name: cfg.zImageVae } },
-    4: { class_type: 'CLIPTextEncode', inputs: { clip: ['2', 0], text: zImagePosText(cfg, args) } },
-    // ModelSamplingAuraFlow 夹在 UNET 和 KSampler 之间，shift 固定 3
-    5: { class_type: 'ModelSamplingAuraFlow', inputs: { model: ['1', 0], shift: 3 } },
-    6: { class_type: 'EmptySD3LatentImage', inputs: { width, height, batch_size: 1 } },
-    7: {
-      class_type: 'KSampler',
-      inputs: {
-        model: ['5', 0],
-        positive: ['4', 0],
-        negative: useRealNegative ? ['8', 0] : ['9', 0],
-        latent_image: ['6', 0],
-        seed,
-        steps,
-        cfg: cfgScale,
-        sampler_name: 'res_multistep',
-        scheduler: 'simple',
-        denoise: 1,
-      },
-    },
-    10: { class_type: 'VAEDecode', inputs: { samples: ['7', 0], vae: ['3', 0] } },
-    11: { class_type: 'SaveImage', inputs: { images: ['10', 0], filename_prefix: 'easy-paint-zimage' } },
   }
-
-  if (useRealNegative) {
-    prompt[8] = { class_type: 'CLIPTextEncode', inputs: { clip: ['2', 0], text: zImageNegText(cfg) } }
-  } else {
-    prompt[9] = { class_type: 'ConditioningZeroOut', inputs: { conditioning: ['4', 0] } }
+  prompt[11] = { class_type: 'VAEDecode', inputs: { samples: ['7', 0], vae: ['3', 0] } }
+  prompt[12] = {
+    class_type: 'SaveImage',
+    inputs: { images: ['11', 0], filename_prefix: 'easy-paint-zimage' },
   }
 
   return { width, height, steps, cfgScale, seed, prompt }
@@ -1025,46 +1075,33 @@ function buildZImageEditWorkflow(cfg, args, imageNames) {
   // 重绘强度：0.6 保留原图结构，1.0 等于整图重画
   const denoise = clampNumber(cfg.zImageEditDenoise, 0.6, 0.1, 1)
   const seed = resolveSeed(args)
-  const useRealNegative = cfgScale > 1
 
-  const prompt = {
-    1: { class_type: 'UNETLoader', inputs: { unet_name: cfg.zImageUnet, weight_dtype: 'default' } },
-    2: {
-      class_type: 'CLIPLoader',
-      inputs: { clip_name: cfg.zImageClip, type: 'lumina2', device: 'default' },
-    },
-    3: { class_type: 'VAELoader', inputs: { vae_name: cfg.zImageVae } },
-    4: { class_type: 'CLIPTextEncode', inputs: { clip: ['2', 0], text: zImagePosText(cfg, args) } },
-    5: { class_type: 'ModelSamplingAuraFlow', inputs: { model: ['1', 0], shift: 3 } },
-    // 参考图先编码成 latent，KSampler 以它为起点配合 denoise < 1 保留结构
-    6: { class_type: 'LoadImage', inputs: { image: imageNames[0] } },
-    7: {
-      class_type: 'KSampler',
-      inputs: {
-        model: ['5', 0],
-        positive: ['4', 0],
-        negative: useRealNegative ? ['9', 0] : ['10', 0],
-        latent_image: ['8', 0],
-        seed,
-        steps,
-        cfg: cfgScale,
-        sampler_name: 'res_multistep',
-        scheduler: 'simple',
-        denoise,
-      },
-    },
-    8: { class_type: 'VAEEncode', inputs: { pixels: ['6', 0], vae: ['3', 0] } },
-    11: { class_type: 'VAEDecode', inputs: { samples: ['7', 0], vae: ['3', 0] } },
-    12: {
-      class_type: 'SaveImage',
-      inputs: { images: ['11', 0], filename_prefix: 'easy-paint-zimage-edit' },
+  const { nodes, useRealNegative } = zImageBaseNodes(cfg, args, cfgScale)
+  const prompt = { ...nodes }
+  const negative = attachZImageNegative(prompt, cfg, useRealNegative, 10)
+
+  // 参考图先编码成 latent，KSampler 以它为起点配合 denoise < 1 保留结构
+  prompt[6] = { class_type: 'LoadImage', inputs: { image: imageNames[0] } }
+  prompt[8] = { class_type: 'VAEEncode', inputs: { pixels: ['6', 0], vae: ['3', 0] } }
+  prompt[7] = {
+    class_type: 'KSampler',
+    inputs: {
+      model: ['5', 0],
+      positive: ['4', 0],
+      negative,
+      latent_image: ['8', 0],
+      seed,
+      steps,
+      cfg: cfgScale,
+      sampler_name: 'res_multistep',
+      scheduler: 'simple',
+      denoise,
     },
   }
-
-  if (useRealNegative) {
-    prompt[9] = { class_type: 'CLIPTextEncode', inputs: { clip: ['2', 0], text: zImageNegText(cfg) } }
-  } else {
-    prompt[10] = { class_type: 'ConditioningZeroOut', inputs: { conditioning: ['4', 0] } }
+  prompt[11] = { class_type: 'VAEDecode', inputs: { samples: ['7', 0], vae: ['3', 0] } }
+  prompt[12] = {
+    class_type: 'SaveImage',
+    inputs: { images: ['11', 0], filename_prefix: 'easy-paint-zimage-edit' },
   }
 
   return { width, height, steps, cfgScale, seed, denoise, edit: true, refCount: 1, prompt }
@@ -1959,7 +1996,7 @@ async function generateImage(args, exec) {
             stale: false,
             source: 'disk',
             ...next,
-            recommended: RECOMMENDED_MODELS,
+            ...RECOMMENDED_ALL(),
           })
           return
         }
@@ -1973,7 +2010,7 @@ async function generateImage(args, exec) {
         stale: true,
         reason: health.online ? 'disk empty' : health.reason,
         ...modelsCache,
-        recommended: RECOMMENDED_MODELS,
+        ...RECOMMENDED_ALL(),
       })
       return
     }
@@ -1981,7 +2018,7 @@ async function generateImage(args, exec) {
       respondJson(res, 200, {
         ok: false,
         error: `ComfyUI 未运行，也没有可用的缓存列表（${health.reason}）`,
-        recommended: RECOMMENDED_MODELS,
+        ...RECOMMENDED_ALL(),
       })
       return
     }
@@ -2031,7 +2068,7 @@ async function generateImage(args, exec) {
       }
       modelsCache = next
       void saveModelsCache(next)
-      respondJson(res, 200, { ok: true, stale: false, ...next, recommended: RECOMMENDED_MODELS })
+      respondJson(res, 200, { ok: true, stale: false, ...next, ...RECOMMENDED_ALL() })
     } catch (error) {
       // 实时读取失败也退回缓存，别让下拉突然消失
       if (modelsCache) {
@@ -2040,11 +2077,11 @@ async function generateImage(args, exec) {
           stale: true,
           reason: error?.message ?? String(error),
           ...modelsCache,
-          recommended: RECOMMENDED_MODELS,
+          ...RECOMMENDED_ALL(),
         })
         return
       }
-      respondJson(res, 200, { ok: false, error: error?.message ?? String(error), recommended: RECOMMENDED_MODELS })
+      respondJson(res, 200, { ok: false, error: error?.message ?? String(error), ...RECOMMENDED_ALL() })
     }
   }
 
