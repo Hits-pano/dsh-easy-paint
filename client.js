@@ -190,7 +190,7 @@ window.__ModuleLoader__.load({
       seatZombie: '无响应·点击修复',
       seatChecking: '自检中…',
       seatParamWarn: '配置待优化',
-      seatParamHintLabel: '请先修改参数',
+      seatParamHintLabel: '无视预警',
       seatParamHint: '参数和当前模型不匹配，去 DSH 设置 → Easy Paint → Qwen 设置里调整采样步数和 CFG。',
       seatForceConfirm: '再点一次强制重启',
       seatTitleZombie: 'ComfyUI 进程卡死（端口被占用但服务无响应），点击强制终止并重启',
@@ -372,7 +372,7 @@ window.__ModuleLoader__.load({
       seatZombie: 'Unresponsive - click to repair',
       seatChecking: 'Checking…',
       seatParamWarn: 'Config needs tuning',
-      seatParamHintLabel: 'Please fix parameters first',
+      seatParamHintLabel: 'Ignore warning',
       seatParamHint: 'Parameters do not match the selected model. Open DSH Settings -> Easy Paint -> Qwen to tune steps and CFG.',
       seatForceConfirm: 'Click again to force restart',
       seatTitleZombie: 'ComfyUI is hung (port held, service unresponsive). Click to force restart.',
@@ -2463,9 +2463,8 @@ const SEAT_STYLE = `
       const [confirming, setConfirming] = React.useState(false)
       const [forceArmed, setForceArmed] = React.useState(false)
       const confirmTimer = React.useRef(null)
-      // 点了「配置待优化」时给一句去哪儿改的指引，8 秒后自动消失
+      // 点了「配置待优化」后切换成「无视预警」，再点一次恢复原样（无自动超时）
       const [paramHint, setParamHint] = React.useState(false)
-      const paramHintTimer = React.useRef(null)
       // 是否显示状态胶囊由「外观设置 → 对话框显示 ComfyUI 状态」决定
       const [seatEnabled, setSeatEnabled] = React.useState(true)
       React.useEffect(() => {
@@ -2527,8 +2526,9 @@ const SEAT_STYLE = `
         label = `${meta.archLabel} ${label}`
       }
 
-      // 点过「配置待优化」之后临时把标签换成一句指引，8 秒后自动还原
-      if (paramHint) label = t('seatParamHintLabel')
+      // 点过一次「配置待优化」后换成「无视预警」，再点一次恢复原样。
+      // 只在 paramWarn 仍为 true 时生效：用户去设置页改好了，就自动回到正常标签。
+      if (paramHint && paramWarn) label = t('seatParamHintLabel')
 
       const body = [h('span', { key: 'dot', className: 'qwd-seat-dot', 'aria-hidden': true }), h('span', { key: 'label' }, label)]
 
@@ -2537,7 +2537,7 @@ const SEAT_STYLE = `
       const fillStyle = fillActive ? { '--qwd-fill': `${fillPercent}%` } : undefined
 
       const offline = state === 'off' || state === 'unknown'
-      const title = paramHint
+      const title = (paramHint && paramWarn)
         ? t('seatParamHint')
         : confirming
         ? t('seatConfirmStop')
@@ -2560,13 +2560,11 @@ const SEAT_STYLE = `
 
       // 离线时点击 = 拉起 ComfyUI。若 Host 报回「僵尸」，则切成需要二次确认的强制重启。
       const handleClick = async () => {
-        // 配置待优化：点状态座该去改设置，而不是启动 ComfyUI。
-        // 离线时尤其容易误触——用户看到黄灯想看看怎么回事，结果把 ComfyUI 拉起来了。
-        // 这里只给提示，不抢「出图中 / 启动中 / 僵尸」这些更紧急的操作。
+        // 配置待优化：点状态座在「配置待优化」和「无视预警」之间切换，
+        // 不启动 ComfyUI（离线时尤其容易误触：看到黄灯想看看怎么回事，
+        // 结果把 ComfyUI 拉起来了）。再点一次回到原样。
         if (paramWarn && !zombie && state !== 'busy' && state !== 'starting') {
-          setParamHint(true)
-          if (paramHintTimer.current !== null) window.clearTimeout(paramHintTimer.current)
-          paramHintTimer.current = window.setTimeout(() => setParamHint(false), 8000)
+          setParamHint((prev) => !prev)
           return
         }
         // 就绪：两次点击才真的终止
