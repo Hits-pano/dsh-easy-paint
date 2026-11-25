@@ -2250,11 +2250,17 @@ const SEAT_STYLE = `
   font-size: 12px; line-height: 1; white-space: nowrap;
   color: var(--dsw-alias-text-secondary, #8b8f96);
   background: rgba(128, 128, 128, .10);
+  /* 边框取自 --qwd-seat-dot：灯是什么颜色，边框就是同色的半透明版。
+     不支持 color-mix 的内核会保留上一行的灰边框。 */
   border: 1px solid rgba(128, 128, 128, .18);
+  border-color: color-mix(in srgb, var(--qwd-seat-dot, #808080) 45%, transparent);
   cursor: pointer; user-select: none;
 }
-.qwd-seat:hover { border-color: var(--dsw-alias-accent, #4a7bd0); }
-.qwd-seat-dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+.qwd-seat:hover { border-color: color-mix(in srgb, var(--qwd-seat-dot, #808080) 75%, transparent); }
+.qwd-seat-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex: none;
+  background: var(--qwd-seat-dot, #9aa0a6);
+}
 /* 设置页用的放大变体 */
 .qwd-seat-panel { height: 32px; padding: 0 14px; border-radius: 16px; font-size: 13px; gap: 8px; }
 .qwd-seat-meta { font-size: 11px; opacity: .7; }
@@ -2269,27 +2275,23 @@ const SEAT_STYLE = `
   pointer-events: none;
 }
 .qwd-seat-fill > * { position: relative; z-index: 1; }
-.qwd-seat-on .qwd-seat-dot { background: #4ea36b; }
-.qwd-seat-busy .qwd-seat-dot { background: #d99a3c; animation: qwd-seat-pulse 1.2s ease-in-out infinite; }
-.qwd-seat-starting .qwd-seat-dot { background: #4a7bd0; animation: qwd-seat-pulse 1.2s ease-in-out infinite; }
-.qwd-seat-off .qwd-seat-dot { background: #cf6a5f; }
-.qwd-seat-unknown .qwd-seat-dot { background: #9aa0a6; }
-/* 终止确认态：整颗胶囊变红，提示「再点一次」 */
-.qwd-seat-stop-confirm { color: #e0867c; border-color: rgba(207, 106, 95, .5); }
-/* 僵尸态：橙红色，提示可强制重启 */
-.qwd-seat-zombie { color: #e0a05c; border-color: rgba(224, 160, 92, .5); }
-.qwd-seat-zombie .qwd-seat-dot { background: #e0a05c; animation: qwd-seat-pulse 1.2s ease-in-out infinite; }
-/* 自检中：紫色呼吸，区别于出图中的橙色 */
-.qwd-seat-checking { color: #a08fe0; border-color: rgba(139, 111, 208, .5); }
-.qwd-seat-checking .qwd-seat-dot { background: #8b6fd0; animation: qwd-seat-pulse 1.2s ease-in-out infinite; }
-/* 配置待优化：整颗胶囊和外框变黄，灯也跟着黄，提示去设置页调整 */
-.qwd-seat-param-warn {
-  color: #e0b054;
-  border-color: rgba(224, 176, 84, .62);
-  background: rgba(224, 176, 84, .1);
-}
-.qwd-seat-param-warn .qwd-seat-dot { background: #e0b054; animation: qwd-seat-pulse 1.2s ease-in-out infinite; }
-.qwd-seat-param-warn:hover { border-color: #e0b054; }
+/* 状态色只在这里定义一次：灯用纯色，边框用同色半透明，两者不会脱节。
+   前五个状态只换灯；后四个状态连文字一起换色，边框和灯仍由变量统一。 */
+.qwd-seat-on { --qwd-seat-dot: #4ea36b; }
+.qwd-seat-busy { --qwd-seat-dot: #d99a3c; }
+.qwd-seat-starting { --qwd-seat-dot: #4a7bd0; }
+.qwd-seat-off { --qwd-seat-dot: #cf6a5f; }
+.qwd-seat-unknown { --qwd-seat-dot: #9aa0a6; }
+.qwd-seat-stop-confirm { --qwd-seat-dot: #e0867c; color: #e0867c; }
+.qwd-seat-zombie { --qwd-seat-dot: #e0a05c; color: #e0a05c; }
+.qwd-seat-checking { --qwd-seat-dot: #8b6fd0; color: #a08fe0; }
+.qwd-seat-param-warn { --qwd-seat-dot: #e0b054; color: #e0b054; background: rgba(224, 176, 84, .1); }
+/* 需要呼吸的状态：颜色来自变量，这里只管动画 */
+.qwd-seat-busy .qwd-seat-dot,
+.qwd-seat-starting .qwd-seat-dot,
+.qwd-seat-zombie .qwd-seat-dot,
+.qwd-seat-checking .qwd-seat-dot,
+.qwd-seat-param-warn .qwd-seat-dot { animation: qwd-seat-pulse 1.2s ease-in-out infinite; }
 /* 配置待优化：和「有未保存改动」同样的整圈外框效果，颜色换成黄 */
 .qwd-fold-param-warn {
   border-color: rgba(224, 176, 84, .62) !important;
