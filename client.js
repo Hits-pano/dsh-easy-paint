@@ -906,6 +906,17 @@ window.__ModuleLoader__.load({
       return (list ?? []).filter((f) => !/^qwen_image|^qwen3vl/i.test(f))
     }
 
+    /**
+     * Qwen 面板的下拉要排掉 Z-Image 专属的文件。
+     *
+     * 最容易混的是文本编码器：Z-Image 用的叫 qwen_3_4b_fp8_mixed，名字带 qwen，
+     * 但和 Qwen-Image 的 qwen3vl_8b 不是同一个文件。光看图名字会以为是 Qwen 的。
+     * ae.safetensors 也是 Z-Image 的 VAE（名字完全不带 z_image，只能单独匹配）。
+     */
+    function excludeZImage(list) {
+      return (list ?? []).filter((f) => !/^z_image|^zimage|^qwen_3_4b|^ae\.safetensors$/i.test(f))
+    }
+
     function ModelField(props) {
       const { label, hint, value, options, onChange, disabled, fallbackHint, t, compatiblePattern } = props
       const list = Array.isArray(options) ? options : []
@@ -1578,7 +1589,7 @@ window.__ModuleLoader__.load({
             label: t('unet'),
             hint: t('unetHint'),
             value: draft.unet ?? '',
-            options: models.unet,
+            options: excludeZImage(models.unet),
             disabled,
             fallbackHint: t('modelFallback'), compatiblePattern: /qwen/iu,
             t,
@@ -1588,7 +1599,7 @@ window.__ModuleLoader__.load({
             label: t('clip'),
             hint: t('clipHint'),
             value: draft.clip ?? '',
-            options: models.clip,
+            options: excludeZImage(models.clip),
             disabled,
             fallbackHint: t('modelFallback'), compatiblePattern: /qwen/iu,
             t,
@@ -1598,7 +1609,7 @@ window.__ModuleLoader__.load({
             label: t('vae'),
             hint: t('vaeHint'),
             value: draft.vae ?? '',
-            options: models.vae,
+            options: excludeZImage(models.vae),
             disabled,
             fallbackHint: t('modelFallback'), compatiblePattern: /qwen/iu,
             t,
