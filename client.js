@@ -152,7 +152,11 @@ window.__ModuleLoader__.load({
       unsavedCount: '{n} 项未保存',
       modelIncompatibleWarn: '这个模型看起来不属于当前架构，出图可能失败。仍可使用。',
       incompatibleCount: '{n} 个模型可能不兼容',
-      saveIncompatibleConfirm: '有 {n} 个模型可能不适用于当前架构（判断依据是文件名，不一定准）。\n仍要保存吗？保存后如果出图失败，请手动换回匹配的模型。',
+      saveConfirm: '确认保存？',
+      paramWarnCount: '{n} 个参数待优化',
+      warnTagBad: '不兼容',
+      warnTagWarn: '预警',
+      incompatibleSummary: '{n} 个模型可能不属于当前架构，出图可能失败',
       noChanges: '没有需要保存的改动',
       resetDefault: '恢复默认',
       resetConfirm: '确定恢复',
@@ -330,7 +334,11 @@ window.__ModuleLoader__.load({
       unsavedCount: '{n} unsaved',
       modelIncompatibleWarn: 'This model does not look like it belongs to the current architecture; generation may fail. It is still selectable.',
       incompatibleCount: '{n} model(s) may be incompatible',
-      saveIncompatibleConfirm: 'Up to {n} model(s) may not fit the current architecture (judged by filename, not always accurate).\nSave anyway? If generation fails, switch back to a matching model.',
+      saveConfirm: 'Confirm save?',
+      paramWarnCount: '{n} parameter(s) need tuning',
+      warnTagBad: 'incompatible',
+      warnTagWarn: 'warning',
+      incompatibleSummary: '{n} model(s) may not belong to the current architecture; generation may fail',
       noChanges: 'Nothing to save',
       resetDefault: 'Reset to defaults',
       resetConfirm: 'Confirm reset',
@@ -471,6 +479,8 @@ window.__ModuleLoader__.load({
 }
 .qwd-save-btn {
   height: 30px; padding: 0 16px; border-radius: 7px;
+  /* 固定最小宽度：文字在「保存设置」和「确认保存？」之间切换时长度不变 */
+  min-width: 96px; text-align: center;
   border: 1px solid rgba(237, 237, 237, .55);
   background: transparent;
   color: var(--dsw-alias-text-primary, #ededed);
@@ -487,10 +497,39 @@ window.__ModuleLoader__.load({
 }
 /* 选了不兼容的模型：保存按钮转红，表示「可以存，但会先确认一次」 */
 .qwd-save-incompatible,
-.qwd-save-incompatible.qwd-save-dirty {
+.qwd-save-incompatible.qwd-save-dirty,
+.qwd-save-incompatible.qwd-save-warn {
   border-color: rgba(207, 106, 95, .7);
   color: #cf6a5f;
   background: rgba(207, 106, 95, .1);
+}
+/* 参数偏离推荐范围（比模型不兼容轻）：保存按钮转黄，同样会先确认 */
+.qwd-save-warn,
+.qwd-save-warn.qwd-save-dirty {
+  border-color: rgba(224, 176, 84, .7);
+  color: #e0b054;
+  background: rgba(224, 176, 84, .1);
+}
+/* 最下方的预警清单：黄=参数偏离，红=模型不兼容 */
+.qwd-warn-list {
+  display: flex; flex-direction: column; gap: 5px;
+  margin: 10px 0 4px; padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(128, 128, 128, .06);
+  border: 1px solid rgba(128, 128, 128, .14);
+}
+.qwd-warn-row {
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 12px; line-height: 1.6;
+}
+.qwd-warn-row-bad { color: #cf6a5f; }
+.qwd-warn-row-warn { color: #e0b054; }
+.qwd-warn-tag {
+  flex: none;
+  padding: 0 6px; border-radius: 4px;
+  font-size: 11px; line-height: 17px;
+  border: 1px solid currentColor;
+  opacity: .85;
 }
 .qwd-save-hint { font-size: 11px; color: var(--dsw-alias-text-secondary, #8b8f96); }
 
@@ -1016,6 +1055,9 @@ window.__ModuleLoader__.load({
       const [checking, setChecking] = React.useState(false)
     // 全局保存按钮的进行中标记
     const [saving, setSaving] = React.useState(false)
+    // 保存前的二次确认：有预警时第一次点击只把按钮文字换成「确认保存？」
+    const [saveArmed, setSaveArmed] = React.useState(false)
+    const saveArmTimer = React.useRef(null)
     // 后端下发的默认值，「恢复默认」用它整体覆盖
     const [defaults, setDefaults] = React.useState({})
     // 后端推导出的 models 目录，用作输入框占位提示
@@ -1353,14 +1395,8 @@ window.__ModuleLoader__.load({
           setMessage(t('noChanges'))
           return
         }
-        // 选到了不兼容的模型：保存前让用户确认一次。
-        // 文件名校验只是参考，用户可能确实要用这个组合——不替他做决定。
-        if (hasIncompatible) {
-          const ok = window.confirm(
-            t('saveIncompatibleConfirm').replace('{n}', String(incompatibleFields.length)),
-          )
-          if (!ok) return
-        }
+        // 有预警时的二次确认放在按钮上（第一次点击变「确认保存？」），
+        // 这里不再弹 window.confirm——弹窗会打断输入，也挡不住误触。
         setSaving(true)
         try {
           const data = await apiPost(API_CONFIG, { config: patch })
@@ -1371,7 +1407,7 @@ window.__ModuleLoader__.load({
         } finally {
           setSaving(false)
         }
-      }, [config, draft, dirtyFields, t, hasIncompatible, incompatibleFields.length])
+      }, [config, draft, dirtyFields, t])
 
       // 采样步数的推荐区间跟着当前模型走：turbo 8–12，原生 20–30
       // ⚠ 这里必须读 qwenSteps 而不是 steps——配置里没有 steps 这个字段，
@@ -1418,6 +1454,104 @@ window.__ModuleLoader__.load({
       // 文案说「固定 1.0」，超过 1 就算偏离
       const zCfgWarn = Number.isFinite(zCfgValue) && zCfgValue > 1
       const zPanelWarn = zStepsWarn || zCfgWarn
+
+      // 汇总所有参数预警（黄色）与模型不兼容（红色），给保存按钮和最下方的清单用。
+      // 文案与各输入框下面那行提示一致，避免同一件事出现两种说法。
+      const paramWarnings = []
+      if (qwenStepsWarn) {
+        paramWarnings.push(
+          t('paramStepsOutOfRange')
+            .replace(/\{v\}/gu, String(stepsValue))
+            .replace(/\{low\}/gu, String(recommendLow))
+            .replace(/\{high\}/gu, String(recommendHigh)),
+        )
+      }
+      if (qwenCfgWarn) {
+        if (turboSelected) {
+          paramWarnings.push(
+            t('paramCfgTooHighForTurbo').replace(/\{v\}/gu, String(Number(draft.qwenCfg))),
+          )
+        } else if (Number(draft.qwenCfg) > 4) {
+          paramWarnings.push(
+            t('paramCfgTooHighForNative')
+              .replace(/\{v\}/gu, String(Number(draft.qwenCfg)))
+              .replace(/\{low\}/gu, '2.5')
+              .replace(/\{high\}/gu, '4'),
+          )
+        } else {
+          paramWarnings.push(
+            t('paramCfgTooLowForNative')
+              .replace(/\{v\}/gu, String(Number(draft.qwenCfg)))
+              .replace(/\{low\}/gu, '2.5')
+              .replace(/\{high\}/gu, '4'),
+          )
+        }
+      }
+      if (sdxlStepsWarn) {
+        paramWarnings.push(
+          t('sdxlStepsOutOfRange')
+            .replace(/\{v\}/gu, String(sdxlStepsValue))
+            .replace(/\{low\}/gu, '25')
+            .replace(/\{high\}/gu, '30'),
+        )
+      }
+      if (sdxlCfgWarn) {
+        paramWarnings.push(
+          (sdxlCfgValue < 7 ? t('sdxlCfgLow') : t('sdxlCfgHigh'))
+            .replace(/\{v\}/gu, String(sdxlCfgValue)),
+        )
+      }
+      if (zStepsWarn) {
+        paramWarnings.push(
+          t('zimageStepsOutOfRange')
+            .replace(/\{v\}/gu, String(zStepsValue))
+            .replace(/\{low\}/gu, '6')
+            .replace(/\{high\}/gu, '12'),
+        )
+      }
+      if (zCfgWarn) {
+        paramWarnings.push(t('zimageCfgHigh').replace(/\{v\}/gu, String(zCfgValue)))
+      }
+      const hasParamWarn = paramWarnings.length > 0
+
+      /**
+       * 保存按钮的点击入口。
+       *
+       * 有预警（参数越界或模型不兼容）时，第一次点击不写盘，只把按钮文字
+       * 换成「确认保存？」并开始倒计时；5 秒内再点一次才真保存。
+       * 这样误触不会直接把有问题的配置存进去，但也不会像 window.confirm
+       * 那样打断输入或挡住页面。
+       */
+      const requestSave = () => {
+        if (saving || disabled || dirtyFields.length === 0) return
+        const needsConfirm = hasIncompatible || hasParamWarn
+        if (needsConfirm && !saveArmed) {
+          setSaveArmed(true)
+          if (saveArmTimer.current !== null) window.clearTimeout(saveArmTimer.current)
+          saveArmTimer.current = window.setTimeout(() => setSaveArmed(false), 5000)
+          return
+        }
+        if (saveArmTimer.current !== null) {
+          window.clearTimeout(saveArmTimer.current)
+          saveArmTimer.current = null
+        }
+        setSaveArmed(false)
+        void saveAll()
+      }
+
+      // 用户一改值就退出「待确认」态，避免旧状态残留到下一次点击
+      React.useEffect(() => {
+        setSaveArmed(false)
+        if (saveArmTimer.current !== null) {
+          window.clearTimeout(saveArmTimer.current)
+          saveArmTimer.current = null
+        }
+      }, [dirtyFields.length])
+
+      // 卸载时清计时器，避免对已卸载组件 setState
+      React.useEffect(() => () => {
+        if (saveArmTimer.current !== null) window.clearTimeout(saveArmTimer.current)
+      }, [])
 
       // 参考图上限：拿硬件推荐值和用户填的值比，超了就把输入框标红
       const hwRefLimit = typeof hw.refLimit?.auto === 'number' ? hw.refLimit.auto : null
@@ -2079,12 +2213,13 @@ window.__ModuleLoader__.load({
         h('div', { className: 'qwd-savebar' },
           h('button', {
             type: 'button',
-            className: (dirtyFields.length > 0 ? 'qwd-save-btn qwd-save-dirty' : 'qwd-save-btn')
-              // 选了不兼容的模型：按钮变红，点保存时会再确认一次
-              + (hasIncompatible ? ' qwd-save-incompatible' : ''),
+            className: 'qwd-save-btn'
+              + (dirtyFields.length > 0 ? ' qwd-save-dirty' : '')
+              // 红 > 黄 > 蓝：模型不兼容比参数越界更严重
+              + (hasIncompatible ? ' qwd-save-incompatible' : (hasParamWarn ? ' qwd-save-warn' : '')),
             disabled: disabled || saving || dirtyFields.length === 0,
-            onClick: () => { void saveAll() },
-          }, saving ? t('saving') : t('saveSettings')),
+            onClick: requestSave,
+          }, saving ? t('saving') : (saveArmed ? t('saveConfirm') : t('saveSettings'))),
 
           h('button', {
             type: 'button',
@@ -2105,11 +2240,32 @@ window.__ModuleLoader__.load({
           hasIncompatible
             ? h('span', { className: 'qwd-save-hint', style: { color: '#cf6a5f' } },
               t('incompatibleCount').replace('{n}', String(incompatibleFields.length)))
-            : null,
+            : hasParamWarn
+              ? h('span', { className: 'qwd-save-hint', style: { color: '#e0b054' } },
+                t('paramWarnCount').replace('{n}', String(paramWarnings.length)))
+              : null,
           dirtyFields.length > 0
             ? h('span', { className: 'qwd-save-hint' }, t('unsavedCount').replace('{n}', String(dirtyFields.length)))
             : null,
         ),
+
+        // 最下方的预警清单：红=模型不兼容（可能导致出图失败），黄=参数偏离推荐范围
+        (hasIncompatible || hasParamWarn)
+          ? h('div', { className: 'qwd-warn-list' },
+            hasIncompatible
+              ? h('div', { className: 'qwd-warn-row qwd-warn-row-bad' },
+                h('span', { className: 'qwd-warn-tag' }, t('warnTagBad')),
+                h('span', null, t('incompatibleSummary').replace('{n}', String(incompatibleFields.length))))
+              : null,
+            paramWarnings.map((line, index) => h('div', {
+              key: `pw${index}`,
+              className: 'qwd-warn-row qwd-warn-row-warn',
+            },
+            h('span', { className: 'qwd-warn-tag' }, t('warnTagWarn')),
+            h('span', null, line),
+            )),
+          )
+          : null,
 
         h('div', { className: bad ? 'qwd-status qwd-status-bad' : 'qwd-status qwd-status-ok', role: 'status' }, message),
       )
