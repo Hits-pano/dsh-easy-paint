@@ -1581,6 +1581,12 @@ async function generateImage(args, exec) {
     return await generateImageUnlocked(args, exec)
   } finally {
     drawBusy = false
+    // 不管成功还是失败，都要把「忙」的状态清掉。
+    // 失败时 runWorkflow 的 finally 可能根本走不到（比如 ComfyUI 中途崩了），
+    // 那 busySince 会一直留着，状态座就永远显示「出图中」。
+    busySince = 0
+    liveProgress = null
+    lastBusyArch = ''
   }
 }
 
@@ -1588,6 +1594,14 @@ async function generateImageUnlocked(args, exec) {
         const calledAt = Date.now()
         const cfg = currentConfig()
         const baseUrl = String(cfg.comfyUrl ?? DEFAULTS.comfyUrl).replace(/\/+$/u, '')
+
+        // ★ 一开始就告诉状态座「用哪个架构、从什么时候开始忙」。
+        //   原来这两个值要等提交成功后才设，中途失败（ComfyUI 崩了、模型没配）
+        //   状态座就只剩个空壳，只看得到「出图中」却不知道在出什么。
+        const archNow = resolveArch(cfg)
+        lastBusyArch = archNow.id
+        busySince = calledAt
+
         // 离线就先拉起来再提交，省得用户自己去开 ComfyUI
         const beforeStart = Date.now()
         await ensureComfy(cfg)
@@ -1619,8 +1633,6 @@ async function generateImageUnlocked(args, exec) {
         }
         // 先确认当前架构的模型字段都填了，不然空字符串塞进工作流会报难懂的错
         assertArchModels(cfg)
-        // 记下这次用的是哪个架构，状态座据此显示「Qwen 出图中」还是「SDXL 出图中」
-        lastBusyArch = resolveArch(cfg).id
         const buildOnce = () => {
           // 按当前架构分发：Qwen / SDXL / Z-Image 的节点图各不相同
           const arch = resolveArch(cfg)
