@@ -1858,6 +1858,12 @@ async function generateImage(args, exec) {
         const body = await readJsonBody(req)
         const incoming = sanitize(body?.config ?? body ?? {})
         const next = { ...fileConfig, ...incoming }
+        // 非 vision 模式不保存视觉模型字段。留着会让人在配置里看到模型名，
+        // 误以为轻量自检也会调云端 API 花钱。
+        if (next.selfCheck !== 'vision') {
+          delete next.selfCheckProvider
+          delete next.selfCheckModel
+        }
         await mkdir(STATE_DIR, { recursive: true })
         await writeFile(STATE_FILE, `${JSON.stringify(next, null, 2)}\n`, 'utf8')
         fileConfig = next
