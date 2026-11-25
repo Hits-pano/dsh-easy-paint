@@ -130,6 +130,9 @@ const DEFAULTS = {
   ],
   // 是否在对话输入框右侧显示 ComfyUI 状态胶囊（关闭后仍可用设置页顶部控制条操作）
   showStatusSeat: true,
+  // 每个主模型上次保存时的采样参数记忆：{ '文件名': { steps, cfg } }
+  // 切换主模型时优先恢复它；没有记忆（新装 / 恢复默认后）才用架构推荐值。
+  modelParams: {},
   // 出图自检：off = 不自检 / light = 轻量（尺寸+文件大小）/ vision = 视觉模型检查
   selfCheck: 'off',
   // 视觉自检使用的 DSH 模型（provider + model id）
@@ -169,6 +172,11 @@ function sanitize(input) {
     const value = input[key]
     if (value === undefined || value === null) continue
     if (value === '' && MODEL_KEYS.has(key)) continue
+    // modelParams 是按模型名存的参数记忆，只接受纯对象，防止坏数据带进来
+    if (key === 'modelParams') {
+      if (typeof value === 'object' && !Array.isArray(value)) out[key] = value
+      continue
+    }
     out[key] = value
   }
   return out

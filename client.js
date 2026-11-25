@@ -1240,6 +1240,44 @@ window.__ModuleLoader__.load({
 
       const patch = (field, raw) => setDraft((prev) => ({ ...prev, [field]: raw }))
 
+      /**
+       * 按主模型文件名给出推荐采样参数。只在「这个模型没有保存过的记忆」时用。
+       * 与后端 DEFAULTS 保持一致：turbo 版 10 步 / CFG 1，原生版 25 步 / CFG 2.5。
+       */
+      const recommendedSampling = (file, kind) => {
+        if (kind === 'sdxl') return { steps: 28, cfg: 7.5 }
+        if (kind === 'zimage') return { steps: 8, cfg: 1 }
+        const turbo = String(file ?? '').toLowerCase().includes('turbo')
+        return turbo ? { steps: 10, cfg: 1 } : { steps: 25, cfg: 2.5 }
+      }
+
+      /**
+       * 切换主模型：优先恢复「这个模型上次保存时的参数」，没有记忆才用推荐值。
+       *
+       * 记忆存在 modelParams 里（{ 文件名: { steps, cfg } }），保存设置时写入。
+       * 用户点「恢复默认」会把它清空，之后所有切换都回到推荐值。
+       */
+      const switchMainModel = (field, filename, kind) => {
+        const memoMap = draft.modelParams && typeof draft.modelParams === 'object' && !Array.isArray(draft.modelParams)
+          ? draft.modelParams
+          : {}
+        const memo = memoMap[filename]
+        const usable = memo
+          && Number.isFinite(Number(memo.steps)) && Number(memo.steps) > 0
+          && Number.isFinite(Number(memo.cfg))
+        const params = usable
+          ? { steps: Number(memo.steps), cfg: Number(memo.cfg) }
+          : recommendedSampling(filename, kind)
+        const stepField = kind === 'sdxl' ? 'sdxlSteps' : kind === 'zimage' ? 'zImageSteps' : 'qwenSteps'
+        const cfgField = kind === 'sdxl' ? 'sdxlCfg' : kind === 'zimage' ? 'zImageCfg' : 'qwenCfg'
+        setDraft((prev) => ({
+          ...prev,
+          [field]: filename,
+          [stepField]: params.steps,
+          [cfgField]: params.cfg,
+        }))
+      }
+
       /** 保存成功后统一同步 state：config 存服务端返回值，draft 重新拉平 */
       const applySavedConfig = (data, fallback) => {
         setConfig(data?.config ?? fallback)
@@ -1384,6 +1422,25 @@ window.__ModuleLoader__.load({
         if (Object.keys(patch).length === 0) {
           setMessage(t('noChanges'))
           return
+        }
+        // 顺手记住三个架构「当前主模型 → 当前采样参数」的对应关系，
+        // 下次切回同一个模型时能把用户调过的值恢复出来。
+        {
+          const memo = draft.modelParams && typeof draft.modelParams === 'object' && !Array.isArray(draft.modelParams)
+            ? { ...draft.modelParams }
+            : {}
+          const remember = (file, steps, cfg) => {
+            const key = String(file ?? '').trim()
+            if (key === '') return
+            const s = Number(steps)
+            const c = Number(cfg)
+            if (!Number.isFinite(s) || s <= 0 || !Number.isFinite(c)) return
+            memo[key] = { steps: s, cfg: c }
+          }
+          remember(draft.unet, draft.qwenSteps, draft.qwenCfg)
+          remember(draft.checkpoint, draft.sdxlSteps, draft.sdxlCfg)
+          remember(draft.zImageUnet, draft.zImageSteps, draft.zImageCfg)
+          patch.modelParams = memo
         }
         // 有预警时的二次确认放在按钮上（第一次点击变「确认保存？」），
         // 这里不再弹 window.confirm——弹窗会打断输入，也挡不住误触。
@@ -1801,7 +1858,7 @@ window.__ModuleLoader__.load({
             fallbackHint: t('modelFallback'),
             compatiblePattern: /^qwen_image|^qwen3vl/iu,
             t,
-            onChange: (v) => { patch('unet', v)},
+            onChange: (v) => { switchMainModel('unet', v, 'qwen')},
           }),
           h(ModelField, {
             label: t('clip'),
@@ -1908,7 +1965,7 @@ window.__ModuleLoader__.load({
           disabled,
           fallbackHint: t('modelFallback'),
           t,
-          onChange: (v) => { patch('checkpoint', v)},
+          onChange: (v) => { switchMainModel('checkpoint', v, 'sdxl')},
         }),
         // LoRA 1–5：和 Checkpoint 并列的独立设置行，留空即不用
         Array.from({ length: 5 }).map((_, index) => {
@@ -2121,7 +2178,7 @@ window.__ModuleLoader__.load({
           fallbackHint: t('modelFallback'),
           compatiblePattern: /^z_image|^zimage/iu,
           t,
-          onChange: (v) => { patch('zImageUnet', v)},
+          onChange: (v) => { switchMainModel('zImageUnet', v, 'zimage')},
         }),
         h(ModelField, {
           label: t('clip'),
