@@ -191,7 +191,7 @@ window.__ModuleLoader__.load({
       seatChecking: '自检中…',
       seatParamWarn: '配置待优化',
       seatParamHintLabel: '无视预警',
-      seatParamHint: '参数和当前模型不匹配，去 DSH 设置 → Easy Paint → Qwen 设置里调整采样步数和 CFG。',
+      seatParamHint: '参数和当前模型不匹配，可以在设置页调整；再点一次将忽略此提示，照常出图。',
       seatForceConfirm: '再点一次强制重启',
       seatTitleZombie: 'ComfyUI 进程卡死（端口被占用但服务无响应），点击强制终止并重启',
     }
@@ -373,7 +373,7 @@ window.__ModuleLoader__.load({
       seatChecking: 'Checking…',
       seatParamWarn: 'Config needs tuning',
       seatParamHintLabel: 'Ignore warning',
-      seatParamHint: 'Parameters do not match the selected model. Open DSH Settings -> Easy Paint -> Qwen to tune steps and CFG.',
+      seatParamHint: 'Parameters do not match the selected model. You can adjust them in Settings; click again to ignore this warning and generate anyway.',
       seatForceConfirm: 'Click again to force restart',
       seatTitleZombie: 'ComfyUI is hung (port held, service unresponsive). Click to force restart.',
     }
@@ -445,14 +445,6 @@ window.__ModuleLoader__.load({
 .qwd-lora-strength::-webkit-inner-spin-button,
 .qwd-lora-strength::-webkit-outer-spin-button { margin-left: 1px; }
 
-/* LoRA 和 Checkpoint 不同系时的警示 */
-.qwd-lora-warn {
-  margin-left: 6px;
-  font-size: 11px;
-  color: #e0a86c;
-  white-space: nowrap;
-}
-
 /* 有未保存改动的折叠面板：外边框变蓝 */
 .qwd-fold-dirty {
   border-color: rgba(107, 164, 255, .55) !important;
@@ -523,6 +515,7 @@ window.__ModuleLoader__.load({
   opacity: .85;
 }
 .qwd-save-hint { font-size: 11px; color: var(--dsw-alias-text-secondary, #8b8f96); }
+.qwd-save-hint-warn { color: #e0b054; }
 
 .qwd-lead { margin: 0 0 20px; font-size: 13px; line-height: 1.7; color: var(--dsw-alias-text-secondary, #8b8f96); }
 .qwd-conn {
@@ -557,28 +550,10 @@ window.__ModuleLoader__.load({
 /* 待确认终止：变红提醒这是第二次点击才会执行 */
 .qwd-bar-btn-confirm { color: #e0867c; border-color: rgba(207, 106, 95, .55); }
 .qwd-bar-btn-confirm:hover:not(:disabled) { border-color: rgba(207, 106, 95, .8); }
-.qwd-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-.qwd-dot-on { background: #4ea36b; }
-.qwd-dot-off { background: #cf6a5f; }
-.qwd-dot-unknown { background: #9aa0a6; }
-.qwd-conn-text { font-size: 13px; color: var(--dsw-alias-text-primary, #ededed); }
-.qwd-conn-meta { font-size: 12px; color: var(--dsw-alias-text-secondary, #8b8f96); }
-/* 未使用 */
-.qwd-recheck-unused {
-  margin-left: auto; padding: 5px 12px; font: inherit; font-size: 12px; cursor: pointer;
-  color: var(--dsw-alias-text-primary, #ededed);
-  background: transparent; border: 1px solid rgba(128, 128, 128, .32); border-radius: 6px;
-}
-.qwd-recheck:hover { border-color: var(--dsw-alias-accent, #4a7bd0); }
-.qwd-recheck:disabled { opacity: .5; cursor: default; }
 .qwd-group { margin: 0 0 26px; }
 .qwd-group-head {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   margin: 0 0 8px;
-}
-.qwd-group-title {
-  margin: 0; font-size: 12px; font-weight: 600; letter-spacing: .04em;
-  text-transform: uppercase; color: var(--dsw-alias-text-secondary, #8b8f96);
 }
 .qwd-mini {
   padding: 3px 9px; font: inherit; font-size: 11px; cursor: pointer;
@@ -704,33 +679,6 @@ window.__ModuleLoader__.load({
   border: 1px solid rgba(224, 168, 108, .3);
   border-radius: 7px;
 }
-/* 参数和所选模型不匹配的提示（只提醒，不阻止出图） */
-.qwd-param-warn {
-  margin: 14px 0 0; padding: 10px 12px;
-  font-size: 12.5px; line-height: 1.65;
-  background: rgba(224, 176, 84, .08);
-  border: 1px solid rgba(224, 176, 84, .32);
-  border-radius: 8px;
-}
-.qwd-param-warn-title {
-  color: #e0b054;
-  font-weight: 600;
-  margin-bottom: 6px;
-}
-.qwd-param-warn-item {
-  color: var(--dsw-alias-text-secondary, #a9adb5);
-  margin-bottom: 4px;
-}
-.qwd-param-warn-item::before {
-  content: '·';
-  color: #e0b054;
-  margin-right: 6px;
-}
-.qwd-param-warn-foot {
-  color: var(--dsw-alias-text-tertiary, #7d8188);
-  margin-top: 6px;
-  font-size: 12px;
-}
 /* 推荐模型清单 */
 .qwd-recommend {
   margin-top: 12px; padding: 10px 12px;
@@ -741,13 +689,6 @@ window.__ModuleLoader__.load({
 .qwd-recommend-head {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   font-size: 12px; color: var(--dsw-alias-text-secondary, #8b8f96); margin-bottom: 8px;
-}
-.qwd-recommend-list { display: flex; flex-direction: column; gap: 5px; }
-/* SDXL 那种纯文字列表（没有文件名和状态列） */
-.qwd-recommend-list-plain {
-  display: flex; flex-direction: column; gap: 4px;
-  font-size: 12px; line-height: 1.6;
-  color: var(--dsw-alias-text-primary, #ededed);
 }
 /* 推荐模型表格：真表格，列宽全局共享，竖线才对得齐 */
 .qwd-recommend-table {
@@ -1043,21 +984,21 @@ window.__ModuleLoader__.load({
       const [message, setMessage] = React.useState('')
       const [bad, setBad] = React.useState(false)
       const [checking, setChecking] = React.useState(false)
-    // 全局保存按钮的进行中标记
-    const [saving, setSaving] = React.useState(false)
-    // 保存前的二次确认：有预警时第一次点击只把按钮文字换成「确认保存？」
-    const [saveArmed, setSaveArmed] = React.useState(false)
-    const saveArmTimer = React.useRef(null)
-    // 后端下发的默认值，「恢复默认」用它整体覆盖
-    const [defaults, setDefaults] = React.useState({})
-    // 后端推导出的 models 目录，用作输入框占位提示
-    const [autoModelsDir, setAutoModelsDir] = React.useState('')
-    // 恢复默认的长按进度（0-100）与是否已就绪
-    const [resetFill, setResetFill] = React.useState(0)
-    const [resetArmed, setResetArmed] = React.useState(false)
-    const resetRaf = React.useRef(null)
-    // 刚填满的那一次松手不算「再点一次」，避免松手即恢复
-    const justArmedRef = React.useRef(false)
+      // 全局保存按钮的进行中标记
+      const [saving, setSaving] = React.useState(false)
+      // 保存前的二次确认：有预警时第一次点击只把按钮文字换成「确认保存？」
+      const [saveArmed, setSaveArmed] = React.useState(false)
+      const saveArmTimer = React.useRef(null)
+      // 后端下发的默认值，「恢复默认」用它整体覆盖
+      const [defaults, setDefaults] = React.useState({})
+      // 后端推导出的 models 目录，用作输入框占位提示
+      const [autoModelsDir, setAutoModelsDir] = React.useState('')
+      // 恢复默认的长按进度（0-100）与是否已就绪
+      const [resetFill, setResetFill] = React.useState(0)
+      const [resetArmed, setResetArmed] = React.useState(false)
+      const resetRaf = React.useRef(null)
+      // 刚填满的那一次松手不算「再点一次」，避免松手即恢复
+      const justArmedRef = React.useRef(false)
       const [hw, setHw] = React.useState({ hardware: null, refLimit: null })
       const [visionModels, setVisionModels] = React.useState([])
       const [loadingVision, setLoadingVision] = React.useState(false)
@@ -1270,12 +1211,17 @@ window.__ModuleLoader__.load({
           : recommendedSampling(filename, kind)
         const stepField = kind === 'sdxl' ? 'sdxlSteps' : kind === 'zimage' ? 'zImageSteps' : 'qwenSteps'
         const cfgField = kind === 'sdxl' ? 'sdxlCfg' : kind === 'zimage' ? 'zImageCfg' : 'qwenCfg'
-        setDraft((prev) => ({
-          ...prev,
-          [field]: filename,
-          [stepField]: params.steps,
-          [cfgField]: params.cfg,
-        }))
+        const picked = String(filename ?? '').trim() !== ''
+        setDraft((prev) => {
+          const next = { ...prev, [field]: filename }
+          // 选「（未选择）」时只清空模型，不动采样参数——
+          // 这时候按推荐值改写步数反而莫名其妙。
+          if (picked) {
+            next[stepField] = params.steps
+            next[cfgField] = params.cfg
+          }
+          return next
+        })
       }
 
       /** 保存成功后统一同步 state：config 存服务端返回值，draft 重新拉平 */
@@ -1478,7 +1424,9 @@ window.__ModuleLoader__.load({
         // turbo 版文案说「建议改回 1」，非 turbo 说「建议 2.5–4」，都按文案来
         return turboSelected ? v > 1 : (v < 2.5 || v > 4)
       })()
-      const qwenStepsWarn = stepsOutOfRange
+      // 和后端保持一致：Qwen 没选模型时既不判 CFG 也不判步数
+      // （空 unet 会被当成「非 turbo」，按原生区间判步数会误报）
+      const qwenStepsWarn = String(draft.unet ?? '').trim() !== '' && stepsOutOfRange
       // 折叠标题要不要标黄：两格里任一出问题就标
       const qwenPanelWarn = qwenStepsWarn || qwenCfgWarn
 
@@ -1502,63 +1450,55 @@ window.__ModuleLoader__.load({
       const zCfgWarn = Number.isFinite(zCfgValue) && zCfgValue > 1
       const zPanelWarn = zStepsWarn || zCfgWarn
 
-      // 汇总所有参数预警（黄色）与模型不兼容（红色），给保存按钮和最下方的清单用。
-      // 文案与各输入框下面那行提示一致，避免同一件事出现两种说法。
-      const paramWarnings = []
-      if (qwenStepsWarn) {
-        paramWarnings.push(
-          t('paramStepsOutOfRange')
-            .replace(/\{v\}/gu, String(stepsValue))
-            .replace(/\{low\}/gu, String(recommendLow))
-            .replace(/\{high\}/gu, String(recommendHigh)),
-        )
-      }
-      if (qwenCfgWarn) {
-        if (turboSelected) {
-          paramWarnings.push(
-            t('paramCfgTooHighForTurbo').replace(/\{v\}/gu, String(Number(draft.qwenCfg))),
-          )
-        } else if (Number(draft.qwenCfg) > 4) {
-          paramWarnings.push(
-            t('paramCfgTooHighForNative')
-              .replace(/\{v\}/gu, String(Number(draft.qwenCfg)))
+      // 参数预警文案：每种问题只拼一次，输入框下面的说明和最下方清单一齐用，
+      // 避免同一件事在界面上出现两种措辞。空字符串表示该项没问题。
+      const qwenCfgValue = Number(draft.qwenCfg)
+      const qwenStepsWarnText = qwenStepsWarn
+        ? t('paramStepsOutOfRange')
+          .replace(/\{v\}/gu, String(stepsValue))
+          .replace(/\{low\}/gu, String(recommendLow))
+          .replace(/\{high\}/gu, String(recommendHigh))
+        : ''
+      const qwenCfgWarnText = qwenCfgWarn
+        ? (turboSelected
+          ? t('paramCfgTooHighForTurbo').replace(/\{v\}/gu, String(qwenCfgValue))
+          : (qwenCfgValue > 4
+            ? t('paramCfgTooHighForNative')
+              .replace(/\{v\}/gu, String(qwenCfgValue))
               .replace(/\{low\}/gu, '2.5')
-              .replace(/\{high\}/gu, '4'),
-          )
-        } else {
-          paramWarnings.push(
-            t('paramCfgTooLowForNative')
-              .replace(/\{v\}/gu, String(Number(draft.qwenCfg)))
+              .replace(/\{high\}/gu, '4')
+            : t('paramCfgTooLowForNative')
+              .replace(/\{v\}/gu, String(qwenCfgValue))
               .replace(/\{low\}/gu, '2.5')
-              .replace(/\{high\}/gu, '4'),
-          )
-        }
-      }
-      if (sdxlStepsWarn) {
-        paramWarnings.push(
-          t('sdxlStepsOutOfRange')
-            .replace(/\{v\}/gu, String(sdxlStepsValue))
-            .replace(/\{low\}/gu, '25')
-            .replace(/\{high\}/gu, '30'),
-        )
-      }
-      if (sdxlCfgWarn) {
-        paramWarnings.push(
-          (sdxlCfgValue < 7 ? t('sdxlCfgLow') : t('sdxlCfgHigh'))
-            .replace(/\{v\}/gu, String(sdxlCfgValue)),
-        )
-      }
-      if (zStepsWarn) {
-        paramWarnings.push(
-          t('zimageStepsOutOfRange')
-            .replace(/\{v\}/gu, String(zStepsValue))
-            .replace(/\{low\}/gu, '6')
-            .replace(/\{high\}/gu, '12'),
-        )
-      }
-      if (zCfgWarn) {
-        paramWarnings.push(t('zimageCfgHigh').replace(/\{v\}/gu, String(zCfgValue)))
-      }
+              .replace(/\{high\}/gu, '4')))
+        : ''
+      const sdxlStepsWarnText = sdxlStepsWarn
+        ? t('sdxlStepsOutOfRange')
+          .replace(/\{v\}/gu, String(sdxlStepsValue))
+          .replace(/\{low\}/gu, '25')
+          .replace(/\{high\}/gu, '30')
+        : ''
+      const sdxlCfgWarnText = sdxlCfgWarn
+        ? (sdxlCfgValue < 7 ? t('sdxlCfgLow') : t('sdxlCfgHigh'))
+          .replace(/\{v\}/gu, String(sdxlCfgValue))
+        : ''
+      const zStepsWarnText = zStepsWarn
+        ? t('zimageStepsOutOfRange')
+          .replace(/\{v\}/gu, String(zStepsValue))
+          .replace(/\{low\}/gu, '6')
+          .replace(/\{high\}/gu, '12')
+        : ''
+      const zCfgWarnText = zCfgWarn
+        ? t('zimageCfgHigh').replace(/\{v\}/gu, String(zCfgValue))
+        : ''
+      const paramWarnings = [
+        qwenStepsWarnText,
+        qwenCfgWarnText,
+        sdxlStepsWarnText,
+        sdxlCfgWarnText,
+        zStepsWarnText,
+        zCfgWarnText,
+      ].filter((text) => text !== '')
       const hasParamWarn = paramWarnings.length > 0
 
       /**
@@ -1901,31 +1841,14 @@ window.__ModuleLoader__.load({
           type: 'number', narrow: true,
           value: draft.qwenSteps ?? 25, disabled,
           warn: qwenStepsWarn,
-          warnText: qwenStepsWarn
-            ? t('paramStepsOutOfRange')
-              .replace(/\{v\}/gu, String(stepsValue))
-              .replace(/\{low\}/gu, String(recommendLow))
-              .replace(/\{high\}/gu, String(recommendHigh))
-            : undefined,
+          warnText: qwenStepsWarnText || undefined,
           onChange: (v) => patch('qwenSteps', v),
         }),
         h(Field, {
           label: t('cfg'), hint: t('cfgHint'), type: 'number', narrow: true,
           value: draft.qwenCfg ?? 2.5, disabled,
           warn: qwenCfgWarn,
-          warnText: qwenCfgWarn
-            ? (turboSelected
-                ? t('paramCfgTooHighForTurbo').replace(/\{v\}/gu, String(Number(draft.qwenCfg)))
-                : Number(draft.qwenCfg) > 4
-                  ? t('paramCfgTooHighForNative')
-                    .replace(/\{v\}/gu, String(Number(draft.qwenCfg)))
-                    .replace(/\{low\}/gu, '2.5')
-                    .replace(/\{high\}/gu, '4')
-                  : t('paramCfgTooLowForNative')
-                    .replace(/\{v\}/gu, String(Number(draft.qwenCfg)))
-                    .replace(/\{low\}/gu, '2.5')
-                    .replace(/\{high\}/gu, '4'))
-            : undefined,
+          warnText: qwenCfgWarnText || undefined,
           onChange: (v) => patch('qwenCfg', v),
         }),
         h(Field, {
@@ -2087,23 +2010,14 @@ window.__ModuleLoader__.load({
           type: 'number', narrow: true,
           value: draft.sdxlSteps ?? 28, disabled,
           warn: sdxlStepsWarn,
-          warnText: sdxlStepsWarn
-            ? t('sdxlStepsOutOfRange')
-              .replace(/\{v\}/gu, String(sdxlStepsValue))
-              .replace(/\{low\}/gu, '25')
-              .replace(/\{high\}/gu, '30')
-            : undefined,
+          warnText: sdxlStepsWarnText || undefined,
           onChange: (v) => patch('sdxlSteps', v),
         }),
         h(Field, {
           label: t('cfg'), hint: t('sdxlCfgHint'), type: 'number', narrow: true,
           value: draft.sdxlCfg ?? 7.5, disabled,
           warn: sdxlCfgWarn,
-          warnText: sdxlCfgWarn
-            ? (sdxlCfgValue < 7
-                ? t('sdxlCfgLow').replace(/\{v\}/gu, String(sdxlCfgValue))
-                : t('sdxlCfgHigh').replace(/\{v\}/gu, String(sdxlCfgValue)))
-            : undefined,
+          warnText: sdxlCfgWarnText || undefined,
           onChange: (v) => patch('sdxlCfg', v),
         }),
         h(Field, {
@@ -2220,21 +2134,14 @@ window.__ModuleLoader__.load({
           type: 'number', narrow: true,
           value: draft.zImageSteps ?? 8, disabled,
           warn: zStepsWarn,
-          warnText: zStepsWarn
-            ? t('zimageStepsOutOfRange')
-              .replace(/\{v\}/gu, String(zStepsValue))
-              .replace(/\{low\}/gu, '6')
-              .replace(/\{high\}/gu, '12')
-            : undefined,
+          warnText: zStepsWarnText || undefined,
           onChange: (v) => patch('zImageSteps', v),
         }),
         h(Field, {
           label: t('cfg'), hint: t('zimageCfgHint'), type: 'number', narrow: true,
           value: draft.zImageCfg ?? 1, disabled,
           warn: zCfgWarn,
-          warnText: zCfgWarn
-            ? t('zimageCfgHigh').replace(/\{v\}/gu, String(zCfgValue))
-            : undefined,
+          warnText: zCfgWarnText || undefined,
           onChange: (v) => patch('zImageCfg', v),
         }),
         h(Field, {
@@ -2262,7 +2169,7 @@ window.__ModuleLoader__.load({
             type: 'button',
             className: 'qwd-save-btn'
               + (dirtyFields.length > 0 ? ' qwd-save-dirty' : '')
-              // 红 > 黄 > 蓝：模型不兼容比参数越界更严重
+              // 有预警（参数越界或模型不兼容）就转黄，点击会先确认一次
               + ((hasIncompatible || hasParamWarn) ? ' qwd-save-warn' : ''),
             disabled: disabled || saving || dirtyFields.length === 0,
             onClick: requestSave,
@@ -2285,10 +2192,10 @@ window.__ModuleLoader__.load({
             },
           }, resetArmed ? t('resetConfirm') : t('resetDefault')),
           hasIncompatible
-            ? h('span', { className: 'qwd-save-hint', style: { color: '#e0b054' } },
+            ? h('span', { className: 'qwd-save-hint qwd-save-hint-warn' },
               t('incompatibleCount').replace('{n}', String(incompatibleFields.length)))
             : hasParamWarn
-              ? h('span', { className: 'qwd-save-hint', style: { color: '#e0b054' } },
+              ? h('span', { className: 'qwd-save-hint qwd-save-hint-warn' },
                 t('paramWarnCount').replace('{n}', String(paramWarnings.length)))
               : null,
           dirtyFields.length > 0
@@ -2296,7 +2203,7 @@ window.__ModuleLoader__.load({
             : null,
         ),
 
-        // 最下方的预警清单：红=模型不兼容（可能导致出图失败），黄=参数偏离推荐范围
+        // 最下方的预警清单：统一黄色，用标签区分「不兼容」和「预警」
         (hasIncompatible || hasParamWarn)
           ? h('div', { className: 'qwd-warn-list' },
             hasIncompatible
