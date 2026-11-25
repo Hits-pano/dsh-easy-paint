@@ -50,6 +50,11 @@ window.__ModuleLoader__.load({
       stepsHintTurbo: 'turbo 模型推荐 8–12 步——步数再多速度白花，画面还可能过曝。',
       stepsHintNative: '原生模型推荐 20–30 步，25 是常用工作点。',
       stepsOutOfRange: '当前值超出推荐范围',
+      paramWarnTitle: '参数和当前模型不匹配',
+      paramCfgTooLowForNative: 'CFG 是 {v}。这个模型不是 turbo 蒸馏版，CFG 低于 {low} 时提示词几乎没有引导力——图生图会表现得像「不响应描述」。建议 {low}–{high}。',
+      paramCfgTooHighForTurbo: 'CFG 是 {v}。turbo 蒸馏版按 CFG 1 训练，调高画面容易过曝。建议改回 1。',
+      paramStepsOutOfRange: '采样步数是 {v}，当前模型推荐 {low}–{high} 步。',
+      paramWarnFoot: '只提示，不影响出图。改完参数记得点底部「保存设置」。',
       autoRetry: '自动重试次数',
       autoRetryHint: '不满意就自动多抽几张。0 = 每次只出 1 张；N = 一次出 1+N 张（不同随机种子）供你挑。越多越慢。',
       editDenoise: '图生图重绘强度',
@@ -212,6 +217,11 @@ window.__ModuleLoader__.load({
       stepsHintTurbo: 'Turbo models work best at 8–12 steps; more only wastes time and can overexpose.',
       stepsHintNative: 'Native models: 20–30 steps, with 25 as the usual working point.',
       stepsOutOfRange: 'current value is outside the recommended range',
+      paramWarnTitle: 'Parameters do not match the selected model',
+      paramCfgTooLowForNative: 'CFG is {v}. This model is not a distilled turbo variant; below CFG {low} the prompt has almost no guidance and image-to-image behaves as if it ignores your description. Suggested range: {low}-{high}.',
+      paramCfgTooHighForTurbo: 'CFG is {v}. Distilled turbo models are trained at CFG 1; higher values tend to blow out the image. Suggested value: 1.',
+      paramStepsOutOfRange: 'Steps is {v}; this model works best at {low}-{high}.',
+      paramWarnFoot: 'This is only a warning - generation still works. Remember to click Save at the bottom after changing values.',
       autoRetry: 'Auto retries',
       autoRetryHint: 'Draw extra candidates automatically. 0 = one image; N = 1+N images with different seeds per call. More is slower.',
       editDenoise: 'Edit strength',
@@ -621,6 +631,33 @@ window.__ModuleLoader__.load({
   background: rgba(224, 168, 108, .1);
   border: 1px solid rgba(224, 168, 108, .3);
   border-radius: 7px;
+}
+/* 参数和所选模型不匹配的提示（只提醒，不阻止出图） */
+.qwd-param-warn {
+  margin: 14px 0 0; padding: 10px 12px;
+  font-size: 12.5px; line-height: 1.65;
+  background: rgba(224, 168, 108, .08);
+  border: 1px solid rgba(224, 168, 108, .32);
+  border-radius: 8px;
+}
+.qwd-param-warn-title {
+  color: #e0a86c;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.qwd-param-warn-item {
+  color: var(--dsw-alias-text-secondary, #a9adb5);
+  margin-bottom: 4px;
+}
+.qwd-param-warn-item::before {
+  content: '·';
+  color: #e0a86c;
+  margin-right: 6px;
+}
+.qwd-param-warn-foot {
+  color: var(--dsw-alias-text-tertiary, #7d8188);
+  margin-top: 6px;
+  font-size: 12px;
 }
 /* 推荐模型清单 */
 .qwd-recommend {
@@ -1228,14 +1265,48 @@ window.__ModuleLoader__.load({
       }, [config, draft, dirtyFields, t])
 
       // 采样步数的推荐区间跟着当前模型走：turbo 8–12，原生 20–30
+      // ⚠ 这里必须读 qwenSteps 而不是 steps——配置里没有 steps 这个字段，
+      //   读不到会让下面的越界判断永远为 false，等于没有预警。
       const turboSelected = String(draft.unet ?? '').toLowerCase().includes('turbo')
       const recommendLow = turboSelected ? 8 : 20
       const recommendHigh = turboSelected ? 12 : 30
-      const stepsValue = Number(draft.steps)
+      const stepsValue = Number(draft.qwenSteps)
       const stepsOutOfRange = Number.isFinite(stepsValue) && stepsValue > 0
         && (stepsValue < recommendLow || stepsValue > recommendHigh)
       const stepsHintText = (turboSelected ? t('stepsHintTurbo') : t('stepsHintNative'))
         + (stepsOutOfRange ? `　⚠ ${t('stepsOutOfRange')}` : '')
+
+      // 参数与模型类型不匹配的具体项。为空表示没问题。
+      // turbo 蒸馏版靠 CFG=1 收敛，非 turbo 版在 CFG=1 时提示词几乎没有引导力，
+      // 图生图会表现得像「不响应描述」——这是最容易踩的坑，必须提前说。
+      const qwenParamWarnings = []
+      // 没选模型时不判：空字符串会被当成「非 turbo」而误报
+      if (String(draft.unet ?? '').trim() !== '') {
+        const cfgValue = Number(draft.qwenCfg)
+        const expectedCfgLow = turboSelected ? 1 : 2.5
+        const expectedCfgHigh = turboSelected ? 1 : 4
+        if (Number.isFinite(cfgValue) && turboSelected && cfgValue > 1.5) {
+          qwenParamWarnings.push(
+            t('paramCfgTooHighForTurbo').replace(/\{v\}/gu, String(cfgValue)),
+          )
+        }
+        if (Number.isFinite(cfgValue) && !turboSelected && cfgValue < expectedCfgLow) {
+          qwenParamWarnings.push(
+            t('paramCfgTooLowForNative')
+              .replace(/\{v\}/gu, String(cfgValue))
+              .replace(/\{low\}/gu, String(expectedCfgLow))
+              .replace(/\{high\}/gu, String(expectedCfgHigh)),
+          )
+        }
+        if (stepsOutOfRange) {
+          qwenParamWarnings.push(
+            t('paramStepsOutOfRange')
+              .replace(/\{v\}/gu, String(stepsValue))
+              .replace(/\{low\}/gu, String(recommendLow))
+              .replace(/\{high\}/gu, String(recommendHigh)),
+          )
+        }
+      }
 
       // 参考图上限：拿硬件推荐值和用户填的值比，超了就把输入框标红
       const hwRefLimit = typeof hw.refLimit?.auto === 'number' ? hw.refLimit.auto : null
@@ -1551,6 +1622,15 @@ window.__ModuleLoader__.load({
           value: draft.maxRefImages ?? 2, invalid: refLimitTooHigh, disabled,
           onChange: (v) => patch('maxRefImages', v),
         }),
+        qwenParamWarnings.length > 0
+          ? h('div', { className: 'qwd-param-warn' },
+            h('div', { className: 'qwd-param-warn-title' }, t('paramWarnTitle')),
+            ...qwenParamWarnings.map((line, i) => h('div', {
+              key: `w${i}`, className: 'qwd-param-warn-item',
+            }, line)),
+            h('div', { className: 'qwd-param-warn-foot' }, t('paramWarnFoot')),
+          )
+          : null,
 
         ),
 
