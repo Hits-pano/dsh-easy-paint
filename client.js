@@ -387,6 +387,8 @@ window.__ModuleLoader__.load({
 /* 恢复默认：红框红字；长按时红色从左侧慢慢填满 */
 .qwd-reset-btn {
   height: 30px; padding: 0 16px; border-radius: 7px;
+  /* 和「保存设置」同宽：「恢复默认」和「确定恢复」都是 4 字，切换时不会跳 */
+  min-width: 96px; text-align: center;
   border: 1px solid rgba(224, 90, 80, .65);
   color: #e05a50;
   font-size: 12px; cursor: pointer;
@@ -888,7 +890,7 @@ window.__ModuleLoader__.load({
       return h('div', { className: 'qwd-field' },
         h('div', { className: 'qwd-field-text' },
           h('div', { className: 'qwd-label' }, label),
-          hint ? h('div', { className: 'qwd-hint' }, hint) : null,
+          hint ? h('div', { className: 'qwd-hint qwd-hint-one-line', title: hint }, hint) : null,
         ),
         h('select', {
           className: 'qwd-input qwd-input-narrow qwd-select',
@@ -904,7 +906,7 @@ window.__ModuleLoader__.load({
       return h('div', { className: 'qwd-field' },
         h('div', { className: 'qwd-field-text' },
           h('div', { className: 'qwd-label' }, label),
-          hint ? h('div', { className: 'qwd-hint' }, hint) : null,
+          hint ? h('div', { className: 'qwd-hint qwd-hint-one-line', title: hint }, hint) : null,
         ),
         h('button', {
           type: 'button',
