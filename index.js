@@ -231,31 +231,7 @@ function pngSize(buffer) {
 }
 
 /**
- * 轻量自检：只做「明显坏掉」的判断，不做内容评估。
- * - PNG 结构有效
- * - 实际尺寸与请求一致
- * - 文件大小不低于可疑阈值（纯色/空图通常几 KB）
- */
-function lightCheck(buffer, expected) {
-  const issues = []
-  const size = pngSize(buffer)
-  if (size === null) {
-    issues.push('不是有效的 PNG 文件')
-  } else {
-    if (Number(expected.width) > 0 && size.width !== expected.width) {
-      issues.push(`宽度 ${size.width} 与请求的 ${expected.width} 不符`)
-    }
-    if (Number(expected.height) > 0 && size.height !== expected.height) {
-      issues.push(`高度 ${size.height} 与请求的 ${expected.height} 不符`)
-    }
-  }
-  if (buffer.length < 5000) {
-    issues.push(`文件仅 ${buffer.length} 字节，疑似空图或纯色图`)
-  }
-  return { mode: 'light', ok: issues.length === 0, issues }
-}
-
-/** 视觉自检用的提示词：要求模型只回一行 JSON，便于解析。 */
+ * 视觉自检用的提示词：要求模型只回一行 JSON，便于解析。 */
 const VISION_CHECK_PROMPT = (prompt) => [
   '你是图片质检员。下面是一张 AI 生成的图片。',
   `生成时的描述是：「${prompt}」。`,
@@ -1679,19 +1655,19 @@ async function generateImageUnlocked(args, exec) {
             // 读不出来就沿用构建时的值，不阻断出图
           }
 
-          // 出图自检：按配置执行，任何失败都只记录不阻断——图已经出来了
+          // 出图自检：只有「视觉」一档需要走这里。
+          // 「轻量」那档（读 PNG 头比尺寸）已经删掉——它几乎不会真的抓到问题，
+          // 反而会误报，让调用方以为图坏了去重画一遍。
           let selfCheck = { mode: 'off', ok: true, issues: [] }
           let selfCheckSeconds = 0
-          if (checkMode === 'light' || checkMode === 'vision') {
+          if (checkMode === 'vision') {
             const checkStart = Date.now()
             selfChecking = true
             try {
               const buffer = outputBuffer ?? await readFile(file)
-              selfCheck = checkMode === 'vision'
-                ? await visionCheck(checkServices, buffer, String(args.prompt ?? ''), cfg)
-                : lightCheck(buffer, workflow)
+              selfCheck = await visionCheck(checkServices, buffer, String(args.prompt ?? ''), cfg)
             } catch (error) {
-              selfCheck = { mode: checkMode, ok: true, skipped: true, issues: [`自检执行失败：${error?.message ?? error}`] }
+              selfCheck = { mode: 'vision', ok: true, skipped: true, issues: [`自检执行失败：${error?.message ?? error}`] }
             } finally {
               selfChecking = false
               selfCheckSeconds = Math.round((Date.now() - checkStart) / 1000)
@@ -1734,7 +1710,10 @@ async function generateImageUnlocked(args, exec) {
 
   ctx.tools.register({
     name: 'draw_image',
-    description: '用本机 ComfyUI 生成一张图片，返回图片绝对路径与本次采样参数。当前支持的架构见设置页。',
+    description: '用本机 ComfyUI 生成一张图片，返回图片绝对路径与本次采样参数。当前支持的架构见设置页。'
+      + '返回里的 selfCheck 只是提示：ok 为 false 表示自检没通过，但图仍然有效。'
+      + '不要因为 selfCheck.ok 是 false 就自动重画——把 issues 转告用户，由用户决定要不要重出。'
+      + '重出次数由设置页的「重新出图次数」控制，工具本身不会自动重试。',
     parameters: {
       prompt: {
         type: 'string',
