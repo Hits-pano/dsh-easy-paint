@@ -903,6 +903,40 @@ function assertArchModels(cfg) {
   )
 }
 
+/**
+ * 当前配置和所选模型是否匹配。
+ *
+ * 起因：非 turbo 的 Qwen 模型配 CFG=1（turbo 蒸馏版的参数）时，提示词几乎
+ * 没有引导力，图生图会表现得像「不响应描述」——但界面上一点提示都没有，
+ * 用户只能靠出图后自己发现。
+ *
+ * 返回空数组表示没问题。只返回「可展示的一句话」，具体措辞交给前端翻译。
+ */
+function computeParamIssues(cfg) {
+  const issues = []
+  const arch = resolveArch(cfg)
+  if (arch.id !== 'qwen-image') return issues
+
+  const unet = String(cfg.unet ?? '').trim()
+  // 没选模型不判——空字符串会被当成「非 turbo」，那是误报
+  if (unet === '') return issues
+
+  const turbo = unet.toLowerCase().includes('turbo')
+  const steps = Number(cfg.qwenSteps)
+  const cfgScale = Number(cfg.qwenCfg)
+
+  if (Number.isFinite(cfgScale)) {
+    if (!turbo && cfgScale < 2.5) issues.push('cfgLowNative')
+    if (turbo && cfgScale > 1.5) issues.push('cfgHighTurbo')
+  }
+  if (Number.isFinite(steps) && steps > 0) {
+    const low = turbo ? 8 : 20
+    const high = turbo ? 12 : 30
+    if (steps < low || steps > high) issues.push('stepsOutOfRange')
+  }
+  return issues
+}
+
 function buildQwenEditWorkflow(cfg, args, imageNames) {
   // 采样参数一律来自设置页；调用参数不参与（用户要求严格限制）
   const preset = SIZE_PRESETS[cfg.size] ?? SIZE_PRESETS['1:1']
@@ -1931,6 +1965,8 @@ async function generateImageUnlocked(args, exec) {
     }
     // 进度只认 10 秒内的新鲜数据，避免任务结束后残留一个旧百分比
     const fresh = liveProgress && Date.now() - liveProgress.at < 10000 ? liveProgress : null
+    // 配置待优化项：状态座和设置页据此变黄提示
+    const paramIssues = computeParamIssues(cfg)
     respondJson(res, 200, {
       ok: true,
       endpoint: baseUrl,
@@ -1938,6 +1974,7 @@ async function generateImageUnlocked(args, exec) {
       archLabel: lastBusyArch === ''
         ? ''
         : (ARCHITECTURES[lastBusyArch]?.shortLabel ?? ARCHITECTURES[lastBusyArch]?.label ?? ''),
+      paramIssues,
       online: health.online === true,
       version: health.version ?? '',
       ...(health.online ? {} : { reason: health.reason }),

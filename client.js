@@ -177,6 +177,9 @@ window.__ModuleLoader__.load({
       seatConfirmStop: '再点一次终止',
       seatZombie: '无响应·点击修复',
       seatChecking: '自检中…',
+      seatParamWarn: '配置待优化',
+      seatParamHintLabel: '请先修改参数',
+      seatParamHint: '参数和当前模型不匹配，去 DSH 设置 → Easy Paint → Qwen 设置里调整采样步数和 CFG。',
       seatForceConfirm: '再点一次强制重启',
       seatTitleZombie: 'ComfyUI 进程卡死（端口被占用但服务无响应），点击强制终止并重启',
     }
@@ -344,6 +347,9 @@ window.__ModuleLoader__.load({
       seatConfirmStop: 'Click again to stop',
       seatZombie: 'Unresponsive - click to repair',
       seatChecking: 'Checking…',
+      seatParamWarn: 'Config needs tuning',
+      seatParamHintLabel: 'Please fix parameters first',
+      seatParamHint: 'Parameters do not match the selected model. Open DSH Settings -> Easy Paint -> Qwen to tune steps and CFG.',
       seatForceConfirm: 'Click again to force restart',
       seatTitleZombie: 'ComfyUI is hung (port held, service unresponsive). Click to force restart.',
     }
@@ -636,12 +642,12 @@ window.__ModuleLoader__.load({
 .qwd-param-warn {
   margin: 14px 0 0; padding: 10px 12px;
   font-size: 12.5px; line-height: 1.65;
-  background: rgba(224, 168, 108, .08);
-  border: 1px solid rgba(224, 168, 108, .32);
+  background: rgba(224, 176, 84, .08);
+  border: 1px solid rgba(224, 176, 84, .32);
   border-radius: 8px;
 }
 .qwd-param-warn-title {
-  color: #e0a86c;
+  color: #e0b054;
   font-weight: 600;
   margin-bottom: 6px;
 }
@@ -651,7 +657,7 @@ window.__ModuleLoader__.load({
 }
 .qwd-param-warn-item::before {
   content: '·';
-  color: #e0a86c;
+  color: #e0b054;
   margin-right: 6px;
 }
 .qwd-param-warn-foot {
@@ -803,10 +809,10 @@ window.__ModuleLoader__.load({
     }
 
     function Fold(props) {
-      const { title, sub, open, onToggle, children, dirty } = props
+      const { title, sub, open, onToggle, children, dirty, warn } = props
       // 内容始终留在 DOM 里，用 grid-template-rows 0fr→1fr 做高度动画。
       // 收起时给 aria-hidden 和 inert，避免键盘焦点跑进看不见的字段。
-      return h('div', { className: `qwd-fold${open ? ' qwd-fold-open' : ''}${dirty ? ' qwd-fold-dirty' : ''}` },
+      return h('div', { className: `qwd-fold${open ? ' qwd-fold-open' : ''}${dirty ? ' qwd-fold-dirty' : ''}${warn ? ' qwd-fold-param-warn' : ''}` },
         h('div', {
           className: 'qwd-fold-head',
           role: 'button',
@@ -835,14 +841,14 @@ window.__ModuleLoader__.load({
     }
 
     function Field(props) {
-      const { label, hint, value, onChange, onBlur, disabled, narrow, type, invalid, placeholder } = props
+      const { label, hint, value, onChange, onBlur, disabled, narrow, type, invalid, warn, placeholder } = props
       return h('div', { className: 'qwd-field' },
         h('div', { className: 'qwd-field-text' },
           h('div', { className: 'qwd-label' }, label),
           hint ? h('div', { className: 'qwd-hint qwd-hint-one-line', title: hint }, hint) : null,
         ),
         h('input', {
-          className: `qwd-input${narrow ? ' qwd-input-narrow' : ''}${invalid === true ? ' qwd-input-invalid' : ''}`,
+          className: `qwd-input${narrow ? ' qwd-input-narrow' : ''}${invalid === true ? ' qwd-input-invalid' : ''}${warn === true ? ' qwd-input-warn' : ''}`,
           type: type ?? 'text',
           value: value ?? '',
           placeholder: placeholder ?? '',
@@ -1308,6 +1314,16 @@ window.__ModuleLoader__.load({
         }
       }
 
+      // 单个输入框的标黄标记：让用户一眼看出该改哪一格
+      const qwenCfgWarn = (() => {
+        if (String(draft.unet ?? '').trim() === '') return false
+        const v = Number(draft.qwenCfg)
+        if (!Number.isFinite(v)) return false
+        return turboSelected ? v > 1.5 : v < 2.5
+      })()
+      const qwenStepsWarn = stepsOutOfRange
+      const qwenPanelWarn = qwenParamWarnings.length > 0
+
       // 参考图上限：拿硬件推荐值和用户填的值比，超了就把输入框标红
       const hwRefLimit = typeof hw.refLimit?.auto === 'number' ? hw.refLimit.auto : null
       const refValueNum = Number(draft.maxRefImages)
@@ -1503,6 +1519,7 @@ window.__ModuleLoader__.load({
         h(Fold, {
           title: t('foldQwen'), sub: t('foldQwenHint'),
           open: openFolds.qwen === true, onToggle: () => toggleFold('qwen'), dirty: panelDirty('qwen'),
+          warn: qwenPanelWarn,
         },
         modelsStale
           ? h('p', { className: 'qwd-hint', style: { margin: '0 0 8px' } }, t('modelStale'))
@@ -1605,11 +1622,13 @@ window.__ModuleLoader__.load({
           hint: stepsHintText,
           type: 'number', narrow: true,
           value: draft.qwenSteps ?? 10, disabled,
+          warn: qwenStepsWarn,
           onChange: (v) => patch('qwenSteps', v),
         }),
         h(Field, {
           label: t('cfg'), hint: t('cfgHint'), type: 'number', narrow: true,
           value: draft.qwenCfg ?? 1, disabled,
+          warn: qwenCfgWarn,
           onChange: (v) => patch('qwenCfg', v),
         }),
         h(Field, {
@@ -2003,6 +2022,32 @@ const SEAT_STYLE = `
 /* 自检中：紫色呼吸，区别于出图中的橙色 */
 .qwd-seat-checking { color: #a08fe0; border-color: rgba(139, 111, 208, .5); }
 .qwd-seat-checking .qwd-seat-dot { background: #8b6fd0; animation: qwd-seat-pulse 1.2s ease-in-out infinite; }
+/* 配置待优化：整颗胶囊和外框变黄，灯也跟着黄，提示去设置页调整 */
+.qwd-seat-param-warn {
+  color: #e0b054;
+  border-color: rgba(224, 176, 84, .62);
+  background: rgba(224, 176, 84, .1);
+}
+.qwd-seat-param-warn .qwd-seat-dot { background: #e0b054; animation: qwd-seat-pulse 1.2s ease-in-out infinite; }
+.qwd-seat-param-warn:hover { border-color: #e0b054; }
+/* 配置待优化：和「有未保存改动」同样的整圈外框效果，颜色换成黄 */
+.qwd-fold-param-warn {
+  border-color: rgba(224, 176, 84, .62) !important;
+  box-shadow: 0 0 0 1px rgba(224, 176, 84, .22);
+}
+.qwd-fold-param-warn > .qwd-fold-head .qwd-fold-title { color: #e0b054; }
+.qwd-fold-param-warn > .qwd-fold-head .qwd-fold-arrow { color: #e0b054; }
+/* 两种提示同时存在时让黄色盖过蓝色：配置要改比「还没保存」更该被看见 */
+.qwd-fold-param-warn.qwd-fold-dirty {
+  border-color: rgba(224, 176, 84, .68) !important;
+  box-shadow: 0 0 0 1px rgba(224, 176, 84, .24);
+}
+/* 出问题的输入框：黄色描边 + 淡黄底（区别于红色错误态的 qwd-input-invalid） */
+.qwd-input-warn,
+.qwd-input-warn:focus {
+  border-color: rgba(224, 176, 84, .7) !important;
+  background: rgba(224, 176, 84, .07) !important;
+}
 @keyframes qwd-seat-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 `
 
@@ -2016,6 +2061,7 @@ const SEAT_STYLE = `
       const [state, setState] = React.useState('unknown')
       const [meta, setMeta] = React.useState({
         progress: null, busySince: null, lastError: '', version: '', endpoint: '', archLabel: '',
+        paramIssues: [],
       })
       const [zombie, setZombie] = React.useState(null)
       const [working, setWorking] = React.useState(false)
@@ -2040,6 +2086,8 @@ const SEAT_STYLE = `
             endpoint: typeof data?.endpoint === 'string' ? data.endpoint : '',
             // 正在跑的架构短名（Qwen / SDXL），状态座显示「Qwen 出图中 4/10」
             archLabel: typeof data?.archLabel === 'string' ? data.archLabel : '',
+            // 配置待优化项：非空就让状态座变黄并提示
+            paramIssues: Array.isArray(data?.paramIssues) ? data.paramIssues.filter((x) => typeof x === 'string') : [],
           })
           return next
         } catch {
@@ -2127,6 +2175,9 @@ const SEAT_STYLE = `
       const [confirming, setConfirming] = React.useState(false)
       const [forceArmed, setForceArmed] = React.useState(false)
       const confirmTimer = React.useRef(null)
+      // 点了「配置待优化」时给一句去哪儿改的指引，8 秒后自动消失
+      const [paramHint, setParamHint] = React.useState(false)
+      const paramHintTimer = React.useRef(null)
       // 是否显示状态胶囊由「外观设置 → 对话框显示 ComfyUI 状态」决定
       const [seatEnabled, setSeatEnabled] = React.useState(true)
       React.useEffect(() => {
@@ -2147,6 +2198,10 @@ const SEAT_STYLE = `
 
       let label
       let fillPercent = null
+      // 配置待优化：非空就变黄。出图中 / 启动中优先显示进程状态，
+      // 其余情况（就绪、离线）都让位给「配置待优化」，否则用户根本注意不到。
+      const paramIssues = Array.isArray(meta.paramIssues) ? meta.paramIssues : []
+      const paramWarn = paramIssues.length > 0
       if (state === 'busy') {
         const p = meta.progress
         const hasSteps = p && typeof p.value === 'number' && typeof p.max === 'number' && p.max > 0
@@ -2166,6 +2221,11 @@ const SEAT_STYLE = `
         label = t('seatForceConfirm')
       } else if (zombie && state === 'off') {
         label = t('seatZombie')
+      } else if (paramWarn && state !== 'starting') {
+        // 配置该调了就提示，跟 ComfyUI 在不在线无关——
+        // 离线时用户更需要知道「就算启动了，这组参数也出不好图」。
+        // 只有「启动中」让位：那个过程是暂时的，且用户需要看到进度。
+        label = t('seatParamWarn')
       } else {
         label = state === 'on' ? t('seatOnline')
           : state === 'starting' ? t('seatStarting')
@@ -2179,6 +2239,9 @@ const SEAT_STYLE = `
         label = `${meta.archLabel} ${label}`
       }
 
+      // 点过「配置待优化」之后临时把标签换成一句指引，8 秒后自动还原
+      if (paramHint) label = t('seatParamHintLabel')
+
       const body = [h('span', { key: 'dot', className: 'qwd-seat-dot', 'aria-hidden': true }), h('span', { key: 'label' }, label)]
 
       // 填充模式：把进度百分比交给 CSS 变量，由 ::before 铺底色
@@ -2186,7 +2249,9 @@ const SEAT_STYLE = `
       const fillStyle = fillActive ? { '--qwd-fill': `${fillPercent}%` } : undefined
 
       const offline = state === 'off' || state === 'unknown'
-      const title = confirming
+      const title = paramHint
+        ? t('seatParamHint')
+        : confirming
         ? t('seatConfirmStop')
         : forceArmed
           ? t('seatForceConfirm')
@@ -2207,6 +2272,15 @@ const SEAT_STYLE = `
 
       // 离线时点击 = 拉起 ComfyUI。若 Host 报回「僵尸」，则切成需要二次确认的强制重启。
       const handleClick = async () => {
+        // 配置待优化：点状态座该去改设置，而不是启动 ComfyUI。
+        // 离线时尤其容易误触——用户看到黄灯想看看怎么回事，结果把 ComfyUI 拉起来了。
+        // 这里只给提示，不抢「出图中 / 启动中 / 僵尸」这些更紧急的操作。
+        if (paramWarn && !zombie && state !== 'busy' && state !== 'starting') {
+          setParamHint(true)
+          if (paramHintTimer.current !== null) window.clearTimeout(paramHintTimer.current)
+          paramHintTimer.current = window.setTimeout(() => setParamHint(false), 8000)
+          return
+        }
         // 就绪：两次点击才真的终止
         if (state === 'on') {
           if (!confirming) {
@@ -2256,9 +2330,13 @@ const SEAT_STYLE = `
       if (!seatEnabled) return null
 
       const visualState = confirming ? 'stop-confirm' : (zombie ? 'zombie' : state)
+      // 配置待优化：整颗胶囊变黄。启动中/僵尸态/终止确认态不抢，其余一律标黄，
+      // 包括离线——离线时更该知道这组参数有问题。
+      const showParamWarn = paramWarn && state !== 'starting' && !zombie && !confirming
       const className = `qwd-seat qwd-seat-${visualState}`
         + (variant === 'panel' ? ' qwd-seat-panel' : '')
         + (fillActive ? ' qwd-seat-fill' : '')
+        + (showParamWarn ? ' qwd-seat-param-warn' : '')
       // 设置页多显示一档：在线时把版本和地址带上
       const extra = variant === 'panel' && state === 'on' && meta.version !== ''
         ? h('span', { className: 'qwd-seat-meta' }, `v${meta.version} · ${meta.endpoint}`)
