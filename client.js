@@ -2463,10 +2463,22 @@ const SEAT_STYLE = `
       const [confirming, setConfirming] = React.useState(false)
       const [forceArmed, setForceArmed] = React.useState(false)
       const confirmTimer = React.useRef(null)
-      // 点了「配置待优化」后切换成「无视预警」，再点一次恢复原样（无自动超时）
+      // 「配置待优化」的三态：
+      //   初始           → 显示「配置待优化」（黄）
+      //   第一次点击     → 显示「无视预警」（确认步骤）
+      //   第二次点击     → 用户确认无视，胶囊恢复正常外观，可以照常出图
       const [paramHint, setParamHint] = React.useState(false)
+      const [paramDismissed, setParamDismissed] = React.useState(false)
       // 是否显示状态胶囊由「外观设置 → 对话框显示 ComfyUI 状态」决定
       const [seatEnabled, setSeatEnabled] = React.useState(true)
+
+      // 预警内容一变（新问题出现、或旧的改好了），就重置「已无视」状态，
+      // 让用户重新看到提示。内容不变时保持无视，不会反复打扰。
+      const paramIssueKey = (Array.isArray(meta.paramIssues) ? meta.paramIssues : []).join(',')
+      React.useEffect(() => {
+        setParamDismissed(false)
+        setParamHint(false)
+      }, [paramIssueKey])
       React.useEffect(() => {
         let alive = true
         fetch(API_CONFIG, { cache: 'no-store' })
@@ -2489,6 +2501,8 @@ const SEAT_STYLE = `
       // 其余情况（就绪、离线）都让位给「配置待优化」，否则用户根本注意不到。
       const paramIssues = Array.isArray(meta.paramIssues) ? meta.paramIssues : []
       const paramWarn = paramIssues.length > 0
+      // 用户确认「无视」之后就不再打扰，胶囊按正常状态显示
+      const paramActive = paramWarn && !paramDismissed
       if (state === 'busy') {
         const p = meta.progress
         const hasSteps = p && typeof p.value === 'number' && typeof p.max === 'number' && p.max > 0
@@ -2508,7 +2522,7 @@ const SEAT_STYLE = `
         label = t('seatForceConfirm')
       } else if (zombie && state === 'off') {
         label = t('seatZombie')
-      } else if (paramWarn && state !== 'starting') {
+      } else if (paramActive && state !== 'starting') {
         // 配置该调了就提示，跟 ComfyUI 在不在线无关——
         // 离线时用户更需要知道「就算启动了，这组参数也出不好图」。
         // 只有「启动中」让位：那个过程是暂时的，且用户需要看到进度。
@@ -2526,9 +2540,10 @@ const SEAT_STYLE = `
         label = `${meta.archLabel} ${label}`
       }
 
-      // 点过一次「配置待优化」后换成「无视预警」，再点一次恢复原样。
-      // 只在 paramWarn 仍为 true 时生效：用户去设置页改好了，就自动回到正常标签。
-      if (paramHint && paramWarn) label = t('seatParamHintLabel')
+      // 第一次点击显示「无视预警」确认文案；第二次点击会清掉 paramHint 并置
+      // paramDismissed，标签随之回到正常状态（就绪 / 离线），表示用户选择无视
+      // 这条预警继续用。paramActive 为假（用户已无视，或配置已改好）时不生效。
+      if (paramHint && paramActive) label = t('seatParamHintLabel')
 
       const body = [h('span', { key: 'dot', className: 'qwd-seat-dot', 'aria-hidden': true }), h('span', { key: 'label' }, label)]
 
@@ -2537,7 +2552,7 @@ const SEAT_STYLE = `
       const fillStyle = fillActive ? { '--qwd-fill': `${fillPercent}%` } : undefined
 
       const offline = state === 'off' || state === 'unknown'
-      const title = (paramHint && paramWarn)
+      const title = (paramHint && paramActive)
         ? t('seatParamHint')
         : confirming
         ? t('seatConfirmStop')
@@ -2562,9 +2577,16 @@ const SEAT_STYLE = `
       const handleClick = async () => {
         // 配置待优化：点状态座在「配置待优化」和「无视预警」之间切换，
         // 不启动 ComfyUI（离线时尤其容易误触：看到黄灯想看看怎么回事，
-        // 结果把 ComfyUI 拉起来了）。再点一次回到原样。
-        if (paramWarn && !zombie && state !== 'busy' && state !== 'starting') {
-          setParamHint((prev) => !prev)
+        // 结果把 ComfyUI 拉起来了）。三态：待优化 → 无视预警 → 恢复正常。
+        if (paramActive && !zombie && state !== 'busy' && state !== 'starting') {
+          if (!paramHint) {
+            // 第一次点击：先显示「无视预警」，让用户知道再点一次才真的无视
+            setParamHint(true)
+          } else {
+            // 第二次点击：确认无视，胶囊恢复正常外观，之后可以照常出图
+            setParamHint(false)
+            setParamDismissed(true)
+          }
           return
         }
         // 就绪：两次点击才真的终止
@@ -2618,7 +2640,7 @@ const SEAT_STYLE = `
       const visualState = confirming ? 'stop-confirm' : (zombie ? 'zombie' : state)
       // 配置待优化：整颗胶囊变黄。启动中/僵尸态/终止确认态不抢，其余一律标黄，
       // 包括离线——离线时更该知道这组参数有问题。
-      const showParamWarn = paramWarn && state !== 'starting' && !zombie && !confirming
+      const showParamWarn = paramActive && state !== 'starting' && !zombie && !confirming
       const className = `qwd-seat qwd-seat-${visualState}`
         + (variant === 'panel' ? ' qwd-seat-panel' : '')
         + (fillActive ? ' qwd-seat-fill' : '')
