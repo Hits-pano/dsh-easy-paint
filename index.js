@@ -3,7 +3,9 @@
  *
  * 直接和本机 ComfyUI 的 HTTP API 打交道，不依赖任何 DSH 内部包
  * （本地插件经 Junction 安装，Node 从工作区解析，找不到 app.asar 里的包）。
- * 生成链固定走千问原生工作点：UNETLoader + CLIPLoader(qwen_image) + VAELoader + KSampler。
+ *
+ * 职责：注册 draw_image 工具；按 cfg.arch 从 ARCHITECTURES 派发到三套工作流
+ * （Qwen-Image / SDXL / Z-Image）；解析三层配置；探活与自动启停 ComfyUI。
  *
  * 配置分三层，后者覆盖前者：
  *   1. DEFAULTS（本文件常量）
