@@ -21,6 +21,40 @@
 
 ---
 
+## [0.4.3] - 2026-11-25
+
+两处视觉一致性修正。
+
+### 变更
+
+- **状态胶囊的边框颜色现在跟随指示灯的颜色**。
+
+  原先灯色逐状态写死，边框只给僵尸态、自检中、配置待优化三个状态单独设了色，
+  在线 / 出图中 / 启动中 / 离线 / 未知这五个状态的边框一直是默认灰——胶囊看起来
+  和灯脱节。现在状态色统一收进一个 CSS 变量：
+
+  - 灯：`var(--qwd-seat-dot)`
+  - 边框：`color-mix(in srgb, var(--qwd-seat-dot) 45%, transparent)`
+  - 悬停：同色 75%，比静止时实一点
+
+  以后调状态色只动一行变量，灯和边框不会再有先后不同步的问题。不支持
+  `color-mix` 的内核保留原来的灰边框作为回退。
+
+- **Qwen 面板的介绍和 Z-Image 对齐**。两个面板都是分离式三件套，但原先写法不同：
+
+  ```
+  改前  Qwen     : Qwen-Image 的主模型、文本编码器、VAE
+        Z-Image  : Z-Image-Turbo 分离式三件套（diffusion_models + text_encoders + vae）
+
+  改后  Qwen     : Qwen-Image 分离式三件套（diffusion_models + text_encoders + vae）
+        Z-Image  : Z-Image-Turbo 分离式三件套（diffusion_models + text_encoders + vae）
+  ```
+
+  同时给 Qwen 面板补上了和 Z-Image 对称的提醒「三件套和 Z-Image 不通用，别混用」，
+  位置也一致——都在「刷新模型列表」按钮下方、推荐表格上方。
+
+---
+
 ## [0.4.2] - 2026-11-25
 
 设置页的几处对齐和紧凑化。
