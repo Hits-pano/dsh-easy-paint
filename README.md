@@ -12,6 +12,10 @@
 [![DSH Plugin](https://img.shields.io/badge/DeepSeek%20Harness-plugin-blue.svg)]()
 [![Arch](https://img.shields.io/badge/arch-Qwen--Image%20%7C%20SDXL%20%7C%20Z--Image-8a2be2.svg)]()
 
+> **关于名字**：这个插件最初叫 `Qwen Draw`，只支持 Qwen-Image 一个架构；后来陆续接入 SDXL 和 Z-Image，
+> 名字也跟着改了几次（`qwen-draw-lite` → `dsh-paint-lite` → `dsh-easy-paint`）。
+> 早期提交记录里还留着旧名字，完整演进见 [CHANGELOG](./CHANGELOG.md)。
+
 ---
 
 ## 特性
