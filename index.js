@@ -152,12 +152,22 @@ const STATE_FILE = join(STATE_DIR, 'config.json')
 const MODELS_CACHE_FILE = join(STATE_DIR, 'models-cache.json')
 
 /** 只接受 DEFAULTS 声明过的键，去掉 undefined/null。 */
+/**
+ * 从配置里挑出 DEFAULTS 认识的键。
+ *
+ * 注意空串的处理：多数字段空串是有意义的（比如 outputDir 清空表示用默认目录），
+ * 但模型字段空串没意义——它只会让「默认模型」失效，出图时报「还没选模型」。
+ * 所以模型字段的空串当作「没填」跳过，让 DEFAULTS 兜底。
+ */
+const MODEL_KEYS = new Set(['unet', 'clip', 'vae', 'checkpoint', 'zImageUnet', 'zImageClip', 'zImageVae'])
+
 function sanitize(input) {
   const out = {}
   if (!input || typeof input !== 'object') return out
   for (const key of Object.keys(DEFAULTS)) {
     const value = input[key]
     if (value === undefined || value === null) continue
+    if (value === '' && MODEL_KEYS.has(key)) continue
     out[key] = value
   }
   return out
