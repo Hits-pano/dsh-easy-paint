@@ -915,25 +915,53 @@ function assertArchModels(cfg) {
 function computeParamIssues(cfg) {
   const issues = []
   const arch = resolveArch(cfg)
-  if (arch.id !== 'qwen-image') return issues
 
-  const unet = String(cfg.unet ?? '').trim()
-  // 没选模型不判——空字符串会被当成「非 turbo」，那是误报
-  if (unet === '') return issues
+  if (arch.id === 'qwen-image') {
+    const unet = String(cfg.unet ?? '').trim()
+    // 没选模型不判——空字符串会被当成「非 turbo」，那是误报
+    if (unet === '') return issues
 
-  const turbo = unet.toLowerCase().includes('turbo')
-  const steps = Number(cfg.qwenSteps)
-  const cfgScale = Number(cfg.qwenCfg)
+    const turbo = unet.toLowerCase().includes('turbo')
+    const steps = Number(cfg.qwenSteps)
+    const cfgScale = Number(cfg.qwenCfg)
 
-  if (Number.isFinite(cfgScale)) {
-    if (!turbo && cfgScale < 2.5) issues.push('cfgLowNative')
-    if (turbo && cfgScale > 1.5) issues.push('cfgHighTurbo')
+    if (Number.isFinite(cfgScale)) {
+      if (!turbo && cfgScale < 2.5) issues.push('cfgLowNative')
+      if (turbo && cfgScale > 1.5) issues.push('cfgHighTurbo')
+    }
+    if (Number.isFinite(steps) && steps > 0) {
+      const low = turbo ? 8 : 20
+      const high = turbo ? 12 : 30
+      if (steps < low || steps > high) issues.push('stepsOutOfRange')
+    }
+    return issues
   }
-  if (Number.isFinite(steps) && steps > 0) {
-    const low = turbo ? 8 : 20
-    const high = turbo ? 12 : 30
-    if (steps < low || steps > high) issues.push('stepsOutOfRange')
+
+  if (arch.id === 'sdxl') {
+    const steps = Number(cfg.sdxlSteps)
+    const cfgScale = Number(cfg.sdxlCfg)
+    // SDXL 的 CFG 低于 5 时画面发灰、明显不跟提示词；高于 12 容易过曝和糊
+    if (Number.isFinite(cfgScale)) {
+      if (cfgScale < 5) issues.push('sdxlCfgLow')
+      if (cfgScale > 12) issues.push('sdxlCfgHigh')
+    }
+    if (Number.isFinite(steps) && steps > 0 && (steps < 20 || steps > 40)) {
+      issues.push('sdxlStepsOutOfRange')
+    }
+    return issues
   }
+
+  if (arch.id === 'z-image') {
+    const steps = Number(cfg.zImageSteps)
+    const cfgScale = Number(cfg.zImageCfg)
+    // Z-Image-Turbo 按 CFG 1 训练，调高会过曝；步数 8 步是官方甜点
+    if (Number.isFinite(cfgScale) && cfgScale > 1.5) issues.push('zimageCfgHigh')
+    if (Number.isFinite(steps) && steps > 0 && (steps < 6 || steps > 12)) {
+      issues.push('zimageStepsOutOfRange')
+    }
+    return issues
+  }
+
   return issues
 }
 

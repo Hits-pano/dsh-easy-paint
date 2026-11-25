@@ -53,6 +53,13 @@ window.__ModuleLoader__.load({
       paramCfgTooLowForNative: 'CFG 是 {v}。这个模型不是 turbo 蒸馏版，CFG 低于 {low} 时提示词几乎没有引导力——图生图会表现得像「不响应描述」。建议 {low}–{high}。',
       paramCfgTooHighForTurbo: 'CFG 是 {v}。turbo 蒸馏版按 CFG 1 训练，调高画面容易过曝。建议改回 1。',
       paramStepsOutOfRange: '采样步数是 {v}，当前模型推荐 {low}–{high} 步。',
+      // SDXL
+      sdxlCfgLow: 'CFG 是 {v}。SDXL 低于 5 时画面会发灰、明显不跟提示词。建议 7–8。',
+      sdxlCfgHigh: 'CFG 是 {v}。SDXL 高于 12 容易过曝发糊。建议 7–8。',
+      sdxlStepsOutOfRange: '采样步数是 {v}，SDXL 推荐 {low}–{high} 步。太少会糊，再多收益递减。',
+      // Z-Image
+      zimageCfgHigh: 'CFG 是 {v}。Z-Image-Turbo 按 CFG 1 训练，调高容易过曝。建议改回 1。',
+      zimageStepsOutOfRange: '采样步数是 {v}，Z-Image-Turbo 推荐 {low}–{high} 步（8 步是官方甜点）。',
       autoRetry: '自动重试次数',
       autoRetryHint: '不满意就自动多抽几张。0 = 每次只出 1 张；N = 一次出 1+N 张（不同随机种子）供你挑。越多越慢。',
       editDenoise: '图生图重绘强度',
@@ -223,6 +230,13 @@ window.__ModuleLoader__.load({
       paramCfgTooLowForNative: 'CFG is {v}. This model is not a distilled turbo variant; below CFG {low} the prompt has almost no guidance and image-to-image behaves as if it ignores your description. Suggested range: {low}-{high}.',
       paramCfgTooHighForTurbo: 'CFG is {v}. Distilled turbo models are trained at CFG 1; higher values tend to blow out the image. Suggested value: 1.',
       paramStepsOutOfRange: 'Steps is {v}; this model works best at {low}-{high}.',
+      // SDXL
+      sdxlCfgLow: 'CFG is {v}. Below 5 SDXL produces washed-out images that ignore the prompt. Suggested range: 7-8.',
+      sdxlCfgHigh: 'CFG is {v}. Above 12 SDXL tends to blow out and blur. Suggested range: 7-8.',
+      sdxlStepsOutOfRange: 'Steps is {v}; SDXL works best at {low}-{high}.',
+      // Z-Image
+      zimageCfgHigh: 'CFG is {v}. Z-Image-Turbo is trained at CFG 1; higher values tend to blow out. Suggested: 1.',
+      zimageStepsOutOfRange: 'Steps is {v}; Z-Image-Turbo works best at {low}-{high} (8 is the sweet spot).',
       autoRetry: 'Auto retries',
       autoRetryHint: 'Draw extra candidates automatically. 0 = one image; N = 1+N images with different seeds per call. More is slower.',
       editDenoise: 'Edit strength',
@@ -1368,6 +1382,22 @@ window.__ModuleLoader__.load({
       // 折叠标题要不要标黄：两格里任一出问题就标
       const qwenPanelWarn = qwenStepsWarn || qwenCfgWarn
 
+      // SDXL 的参数区间和 Qwen 完全不同，单独算
+      const sdxlStepsValue = Number(draft.sdxlSteps)
+      const sdxlCfgValue = Number(draft.sdxlCfg)
+      const sdxlStepsWarn = Number.isFinite(sdxlStepsValue) && sdxlStepsValue > 0
+        && (sdxlStepsValue < 20 || sdxlStepsValue > 40)
+      const sdxlCfgWarn = Number.isFinite(sdxlCfgValue) && (sdxlCfgValue < 5 || sdxlCfgValue > 12)
+      const sdxlPanelWarn = sdxlStepsWarn || sdxlCfgWarn
+
+      // Z-Image-Turbo 按 CFG 1 训练，步数 8 是官方甜点
+      const zStepsValue = Number(draft.zImageSteps)
+      const zCfgValue = Number(draft.zImageCfg)
+      const zStepsWarn = Number.isFinite(zStepsValue) && zStepsValue > 0
+        && (zStepsValue < 6 || zStepsValue > 12)
+      const zCfgWarn = Number.isFinite(zCfgValue) && zCfgValue > 1.5
+      const zPanelWarn = zStepsWarn || zCfgWarn
+
       // 参考图上限：拿硬件推荐值和用户填的值比，超了就把输入框标红
       const hwRefLimit = typeof hw.refLimit?.auto === 'number' ? hw.refLimit.auto : null
       const refValueNum = Number(draft.maxRefImages)
@@ -1707,6 +1737,7 @@ window.__ModuleLoader__.load({
         h(Fold, {
           title: t('foldSdxl'), sub: t('foldSdxlHint'),
           open: openFolds.sdxl === true, onToggle: () => toggleFold('sdxl'), dirty: panelDirty('sdxl'),
+          warn: sdxlPanelWarn,
         },
         h('p', { className: 'qwd-cost-warn', style: { margin: '0 0 10px' } }, t('sdxlEditNote')),
         h('div', { className: 'qwd-group-head' },
@@ -1848,11 +1879,24 @@ window.__ModuleLoader__.load({
           hint: t('sdxlStepsHint'),
           type: 'number', narrow: true,
           value: draft.sdxlSteps ?? 28, disabled,
+          warn: sdxlStepsWarn,
+          warnText: sdxlStepsWarn
+            ? t('sdxlStepsOutOfRange')
+              .replace(/\{v\}/gu, String(sdxlStepsValue))
+              .replace(/\{low\}/gu, '20')
+              .replace(/\{high\}/gu, '40')
+            : undefined,
           onChange: (v) => patch('sdxlSteps', v),
         }),
         h(Field, {
           label: t('cfg'), hint: t('sdxlCfgHint'), type: 'number', narrow: true,
           value: draft.sdxlCfg ?? 7.5, disabled,
+          warn: sdxlCfgWarn,
+          warnText: sdxlCfgWarn
+            ? (sdxlCfgValue < 5
+                ? t('sdxlCfgLow').replace(/\{v\}/gu, String(sdxlCfgValue))
+                : t('sdxlCfgHigh').replace(/\{v\}/gu, String(sdxlCfgValue)))
+            : undefined,
           onChange: (v) => patch('sdxlCfg', v),
         }),
         h(Field, {
@@ -1866,6 +1910,7 @@ window.__ModuleLoader__.load({
         h(Fold, {
           title: t('foldZImage'), sub: t('foldZImageHint'),
           open: openFolds.zimage === true, onToggle: () => toggleFold('zimage'), dirty: panelDirty('zimage'),
+          warn: zPanelWarn,
         },
         modelsStale
           ? h('p', { className: 'qwd-hint', style: { margin: '0 0 8px' } }, t('modelStale'))
@@ -1967,11 +2012,22 @@ window.__ModuleLoader__.load({
           hint: t('zimageStepsHint'),
           type: 'number', narrow: true,
           value: draft.zImageSteps ?? 8, disabled,
+          warn: zStepsWarn,
+          warnText: zStepsWarn
+            ? t('zimageStepsOutOfRange')
+              .replace(/\{v\}/gu, String(zStepsValue))
+              .replace(/\{low\}/gu, '6')
+              .replace(/\{high\}/gu, '12')
+            : undefined,
           onChange: (v) => patch('zImageSteps', v),
         }),
         h(Field, {
           label: t('cfg'), hint: t('zimageCfgHint'), type: 'number', narrow: true,
           value: draft.zImageCfg ?? 1, disabled,
+          warn: zCfgWarn,
+          warnText: zCfgWarn
+            ? t('zimageCfgHigh').replace(/\{v\}/gu, String(zCfgValue))
+            : undefined,
           onChange: (v) => patch('zImageCfg', v),
         }),
         h(Field, {
