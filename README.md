@@ -466,6 +466,23 @@ diffusion 模型、文本编码器、VAE（带推荐模型表格）、采样参�
   靠 ComfyUI 动态卸载硬撑。插件会在每次出图后清一次缓存（不卸载模型）来缓解
   累积，但想稳还是建议参考图上限设成 1 张（实测 1 张成功 184 次、2 张只撑了 23 次）
 
+## 仓库结构
+
+| 文件 / 目录 | 用途 |
+|---|---|
+| `index.js` | Host 侧：注册 `draw_image` 工具、构建三套架构的 ComfyUI 工作流、解析配置、自动启停 ComfyUI |
+| `client.js` | 设置页：6 个折叠面板、状态胶囊、参数预警计算，以及这个插件的全部 CSS |
+| `package.json` | 插件清单，`dsh.bundle.patch` 指向 `cordis.patch.yml` |
+| `cordis.patch.yml` | 插件挂载点（bundle 声明） |
+| `locale/zh.json`、`locale/en.json` | 插件列表卡片的标题与描述（这两个会显示在 DSH 的插件页面里） |
+| `icon.svg`、`assets/icon-180.png` | 插件图标，矢量与位图各一份 |
+| `docs/*.png` | README 里引用的设置页截图 |
+| `screenshots.json` | 截图清单，插件市场读取 |
+| `CHANGELOG.md` | 按版本记录的变更历史 |
+
+> GitHub 文件列表里每个条目后面那行灰字，是该文件**最后一次提交**的说明（commit message），
+> 不是文件当前功能的描述。要看每个文件现在负责什么，以上表为准。
+
 ## 致谢
 
 工作流设计与参数取值参考了 **dsh-qwen-paint**（作者 [@yanfei0725](https://github.com/yanfei0725)）。
