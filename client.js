@@ -80,7 +80,8 @@ window.__ModuleLoader__.load({
       hasPython: '有 Python',
       noPython: '缺 Python',
       foldQwen: 'Qwen 设置',
-      foldQwenHint: 'Qwen-Image 的主模型、文本编码器、VAE',
+      foldQwenHint: 'Qwen-Image 分离式三件套（diffusion_models + text_encoders + vae）',
+      qwenNote: '三件套和 Z-Image 不通用，别混用。',
       foldZImage: 'Z-Image 设置',
       foldZImageHint: 'Z-Image-Turbo 分离式三件套（diffusion_models + text_encoders + vae）',
       zimageNote: '三件套和 Qwen 不通用，别混用。',
@@ -262,7 +263,8 @@ window.__ModuleLoader__.load({
       hasPython: 'Python ok',
       noPython: 'no Python',
       foldQwen: 'Qwen',
-      foldQwenHint: 'Qwen-Image diffusion model, text encoder and VAE',
+      foldQwenHint: 'Qwen-Image split files (diffusion_models + text_encoders + vae)',
+      qwenNote: 'These files are not interchangeable with Z-Image.',
       foldZImage: 'Z-Image',
       foldZImageHint: 'Z-Image-Turbo split files (diffusion_models + text_encoders + vae)',
       zimageNote: 'These files are not interchangeable with Qwen.',
@@ -1754,6 +1756,7 @@ window.__ModuleLoader__.load({
             },
           }, refreshingModels ? t('reloading') : t('reload')),
         ),
+        h('p', { className: 'qwd-hint', style: { margin: '0 0 10px' } }, t('qwenNote')),
 
         // 新用户不知道该装什么模型：列出实测可用的一套，标出本机装了哪些
         recommended
