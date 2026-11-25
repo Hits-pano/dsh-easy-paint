@@ -50,11 +50,9 @@ window.__ModuleLoader__.load({
       stepsHintTurbo: 'turbo 模型推荐 8–12 步——步数再多速度白花，画面还可能过曝。',
       stepsHintNative: '原生模型推荐 20–30 步，25 是常用工作点。',
       stepsOutOfRange: '当前值超出推荐范围',
-      paramWarnTitle: '参数和当前模型不匹配',
       paramCfgTooLowForNative: 'CFG 是 {v}。这个模型不是 turbo 蒸馏版，CFG 低于 {low} 时提示词几乎没有引导力——图生图会表现得像「不响应描述」。建议 {low}–{high}。',
       paramCfgTooHighForTurbo: 'CFG 是 {v}。turbo 蒸馏版按 CFG 1 训练，调高画面容易过曝。建议改回 1。',
       paramStepsOutOfRange: '采样步数是 {v}，当前模型推荐 {low}–{high} 步。',
-      paramWarnFoot: '只提示，不影响出图。改完参数记得点底部「保存设置」。',
       autoRetry: '自动重试次数',
       autoRetryHint: '不满意就自动多抽几张。0 = 每次只出 1 张；N = 一次出 1+N 张（不同随机种子）供你挑。越多越慢。',
       editDenoise: '图生图重绘强度',
@@ -144,6 +142,9 @@ window.__ModuleLoader__.load({
       saveSettings: '保存设置',
       saving: '保存中…',
       unsavedCount: '{n} 项未保存',
+      modelIncompatibleWarn: '这个模型看起来不属于当前架构，出图可能失败。仍可使用。',
+      incompatibleCount: '{n} 个模型可能不兼容',
+      saveIncompatibleConfirm: '有 {n} 个模型可能不适用于当前架构（判断依据是文件名，不一定准）。\n仍要保存吗？保存后如果出图失败，请手动换回匹配的模型。',
       noChanges: '没有需要保存的改动',
       resetDefault: '恢复默认',
       resetConfirm: '确定恢复',
@@ -153,7 +154,7 @@ window.__ModuleLoader__.load({
       loading: '正在读取配置…',
       modelFallback: '未能从 ComfyUI 取得模型列表，手动填写文件名。',
       modelNotPicked: '（未选择）',
-      modelIncompatible: '（不兼容）',
+      modelIncompatible: '不兼容',
       recTitle: '推荐模型',
       recApply: '填入已安装的推荐项',
       recColKind: '类型',
@@ -219,11 +220,9 @@ window.__ModuleLoader__.load({
       stepsHintTurbo: 'Turbo models work best at 8–12 steps; more only wastes time and can overexpose.',
       stepsHintNative: 'Native models: 20–30 steps, with 25 as the usual working point.',
       stepsOutOfRange: 'current value is outside the recommended range',
-      paramWarnTitle: 'Parameters do not match the selected model',
       paramCfgTooLowForNative: 'CFG is {v}. This model is not a distilled turbo variant; below CFG {low} the prompt has almost no guidance and image-to-image behaves as if it ignores your description. Suggested range: {low}-{high}.',
       paramCfgTooHighForTurbo: 'CFG is {v}. Distilled turbo models are trained at CFG 1; higher values tend to blow out the image. Suggested value: 1.',
       paramStepsOutOfRange: 'Steps is {v}; this model works best at {low}-{high}.',
-      paramWarnFoot: 'This is only a warning - generation still works. Remember to click Save at the bottom after changing values.',
       autoRetry: 'Auto retries',
       autoRetryHint: 'Draw extra candidates automatically. 0 = one image; N = 1+N images with different seeds per call. More is slower.',
       editDenoise: 'Edit strength',
@@ -313,6 +312,9 @@ window.__ModuleLoader__.load({
       saveSettings: 'Save settings',
       saving: 'Saving…',
       unsavedCount: '{n} unsaved',
+      modelIncompatibleWarn: 'This model does not look like it belongs to the current architecture; generation may fail. It is still selectable.',
+      incompatibleCount: '{n} model(s) may be incompatible',
+      saveIncompatibleConfirm: 'Up to {n} model(s) may not fit the current architecture (judged by filename, not always accurate).\nSave anyway? If generation fails, switch back to a matching model.',
       noChanges: 'Nothing to save',
       resetDefault: 'Reset to defaults',
       resetConfirm: 'Confirm reset',
@@ -322,7 +324,7 @@ window.__ModuleLoader__.load({
       loading: 'Loading configuration…',
       modelFallback: 'Could not read the model list from ComfyUI; type the file name.',
       modelNotPicked: '(not selected)',
-      modelIncompatible: '(incompatible)',
+      modelIncompatible: 'incompatible',
       recTitle: 'Recommended models',
       recApply: 'Fill installed ones',
       recColKind: 'Kind',
@@ -467,6 +469,13 @@ window.__ModuleLoader__.load({
   color: var(--dsw-alias-accent-primary, #6ba4ff);
   background: rgba(107, 164, 255, .1);
 }
+/* 选了不兼容的模型：保存按钮转红，表示「可以存，但会先确认一次」 */
+.qwd-save-incompatible,
+.qwd-save-incompatible.qwd-save-dirty {
+  border-color: rgba(207, 106, 95, .7);
+  color: #cf6a5f;
+  background: rgba(207, 106, 95, .1);
+}
 .qwd-save-hint { font-size: 11px; color: var(--dsw-alias-text-secondary, #8b8f96); }
 
 .qwd-lead { margin: 0 0 20px; font-size: 13px; line-height: 1.7; color: var(--dsw-alias-text-secondary, #8b8f96); }
@@ -537,6 +546,16 @@ window.__ModuleLoader__.load({
   padding: 10px 0; border-bottom: 1px solid rgba(128, 128, 128, .12);
 }
 .qwd-field:last-child { border-bottom: none; }
+/* 输入框下面要多挂一行说明时用：把横向的 .qwd-field 包起来，
+   让说明文字独占一行，而不是被 flex 挤到输入框右边。 */
+.qwd-field-column { display: flex; flex-direction: column; }
+.qwd-field-column > .qwd-field { padding-bottom: 4px; }
+.qwd-field-column > .qwd-field-note {
+  margin: 0 0 8px; padding-right: 8px;
+  font-size: 12px; line-height: 1.55;
+}
+.qwd-field-note-bad { color: #cf6a5f; }
+.qwd-field-note-warn { color: #e0b054; }
 /* 可折叠分组（手风琴） */
 .qwd-fold {
   margin: 0 0 10px; border-radius: 10px; overflow: hidden;
@@ -839,8 +858,8 @@ window.__ModuleLoader__.load({
     }
 
     function Field(props) {
-      const { label, hint, value, onChange, onBlur, disabled, narrow, type, invalid, warn, placeholder } = props
-      return h('div', { className: 'qwd-field' },
+      const { label, hint, value, onChange, onBlur, disabled, narrow, type, invalid, warn, warnText, placeholder } = props
+      const row = h('div', { className: 'qwd-field' },
         h('div', { className: 'qwd-field-text' },
           h('div', { className: 'qwd-label' }, label),
           hint ? h('div', { className: 'qwd-hint qwd-hint-one-line', title: hint }, hint) : null,
@@ -855,6 +874,13 @@ window.__ModuleLoader__.load({
           onBlur: () => { if (typeof onBlur === 'function') onBlur() },
         }),
       )
+      // 传了 warnText 就在输入框下面单独挂一行说明（不塞进横向的 .qwd-field 里，
+      // 否则会被 justify-content: space-between 挤到输入框右边）
+      if (!warnText) return row
+      return h('div', { className: 'qwd-field-column' }, row,
+        h('div', {
+          className: `qwd-field-note ${warn === true ? 'qwd-field-note-warn' : 'qwd-field-note-bad'}`,
+        }, warnText))
     }
 
     function SelectField(props) {
@@ -912,19 +938,24 @@ window.__ModuleLoader__.load({
        * 兼容性判断。
        *
        * 不把别的架构的文件过滤掉——用户需要看到「本机装了哪些」，
-       * 否则误判时会以为插件根本没识别到。改成「全部列出 + 不兼容的置灰且不可选」：
-       * 看得见、知道为什么、但选不错。
+       * 否则误判时会以为插件根本没识别到。
+       *
+       * 也不阻止选择：文件名判断不一定准（比如 ae.safetensors 是通用名），
+       * 让一个可能错的判断拥有一票否决权，风险比让用户自己决定更大。
+       * 做法是「可选 + 选到不兼容的就标红」，真要用的话保存时会再确认一次。
        */
       const isCompatible = compatiblePattern
         ? (name) => compatiblePattern.test(name)
         : () => true
-      return h('div', { className: 'qwd-field' },
+      const currentBad = typeof value === 'string' && value !== '' && !isCompatible(value)
+      const row = h('div', { className: 'qwd-field' },
         h('div', { className: 'qwd-field-text' },
           h('div', { className: 'qwd-label' }, label),
           hint ? h('div', { className: 'qwd-hint qwd-hint-one-line', title: hint }, hint) : null,
         ),
         h('select', {
-          className: 'qwd-input qwd-select-wide qwd-select',
+          className: 'qwd-input qwd-select-wide qwd-select'
+            + (currentBad ? ' qwd-input-invalid' : ''),
           value: value ?? '',
           disabled: disabled === true,
           onChange: (event) => onChange(event.target.value),
@@ -934,14 +965,14 @@ window.__ModuleLoader__.load({
         merged.includes(value ?? '') ? null : h('option', { value: '' }, t('modelNotPicked')),
         merged.map((option) => {
           const ok = isCompatible(option)
-          return h('option', {
-            key: option,
-            value: option,
-            // 不兼容的置灰且不可选：能看见、知道原因，但点不下去
-            disabled: !ok,
-          }, ok ? option : `${option}　${t('modelIncompatible')}`)
+          return h('option', { key: option, value: option },
+            ok ? option : `${option}　⚠ ${t('modelIncompatible')}`)
         })),
       )
+      // 选到不兼容的模型：说明文字挂在下拉框正下方，独占一行
+      if (!currentBad) return row
+      return h('div', { className: 'qwd-field-column' }, row,
+        h('div', { className: 'qwd-field-note qwd-field-note-bad' }, t('modelIncompatibleWarn')))
     }
 
     function EasyPaintSettings(props) {
@@ -1255,6 +1286,34 @@ window.__ModuleLoader__.load({
         })
       }, [draft, config])
 
+
+      /**
+       * 当前架构下，选中的模型里有没有不兼容的。
+       *
+       * 判断依据只是文件名，不一定准（ae.safetensors 这种通用名尤其容易误判），
+       * 所以不阻止选择、也不直接拦保存，只在保存时弹一次确认让用户自己定。
+       */
+      const incompatibleFields = (() => {
+        const arch = String(draft.arch ?? 'qwen-image')
+        const checks = []
+        if (arch === 'qwen-image') {
+          checks.push(['unet', /^qwen_image|^qwen3vl/iu])
+          checks.push(['clip', /^qwen_image|^qwen3vl/iu])
+          checks.push(['vae', /^qwen_image|^qwen3vl/iu])
+        } else if (arch === 'z-image') {
+          checks.push(['zImageUnet', /^z_image|^zimage/iu])
+          checks.push(['zImageClip', /^qwen_3_4b/iu])
+          checks.push(['zImageVae', /^ae\.safetensors$/iu])
+        }
+        return checks
+          .filter(([key, re]) => {
+            const val = String(draft[key] ?? '').trim()
+            return val !== '' && !re.test(val)
+          })
+          .map(([key]) => key)
+      })()
+      const hasIncompatible = incompatibleFields.length > 0
+
       /** 一次性保存所有改动：底部那颗「保存设置」按钮调它 */
       const saveAll = React.useCallback(async () => {
         if (config === null) return
@@ -1263,6 +1322,14 @@ window.__ModuleLoader__.load({
         if (Object.keys(patch).length === 0) {
           setMessage(t('noChanges'))
           return
+        }
+        // 选到了不兼容的模型：保存前让用户确认一次。
+        // 文件名校验只是参考，用户可能确实要用这个组合——不替他做决定。
+        if (hasIncompatible) {
+          const ok = window.confirm(
+            t('saveIncompatibleConfirm').replace('{n}', String(incompatibleFields.length)),
+          )
+          if (!ok) return
         }
         setSaving(true)
         try {
@@ -1274,7 +1341,7 @@ window.__ModuleLoader__.load({
         } finally {
           setSaving(false)
         }
-      }, [config, draft, dirtyFields, t])
+      }, [config, draft, dirtyFields, t, hasIncompatible, incompatibleFields.length])
 
       // 采样步数的推荐区间跟着当前模型走：turbo 8–12，原生 20–30
       // ⚠ 这里必须读 qwenSteps 而不是 steps——配置里没有 steps 这个字段，
@@ -1288,39 +1355,9 @@ window.__ModuleLoader__.load({
       const stepsHintText = (turboSelected ? t('stepsHintTurbo') : t('stepsHintNative'))
         + (stepsOutOfRange ? `　⚠ ${t('stepsOutOfRange')}` : '')
 
-      // 参数与模型类型不匹配的具体项。为空表示没问题。
-      // turbo 蒸馏版靠 CFG=1 收敛，非 turbo 版在 CFG=1 时提示词几乎没有引导力，
-      // 图生图会表现得像「不响应描述」——这是最容易踩的坑，必须提前说。
-      const qwenParamWarnings = []
-      // 没选模型时不判：空字符串会被当成「非 turbo」而误报
-      if (String(draft.unet ?? '').trim() !== '') {
-        const cfgValue = Number(draft.qwenCfg)
-        const expectedCfgLow = turboSelected ? 1 : 2.5
-        const expectedCfgHigh = turboSelected ? 1 : 4
-        if (Number.isFinite(cfgValue) && turboSelected && cfgValue > 1.5) {
-          qwenParamWarnings.push(
-            t('paramCfgTooHighForTurbo').replace(/\{v\}/gu, String(cfgValue)),
-          )
-        }
-        if (Number.isFinite(cfgValue) && !turboSelected && cfgValue < expectedCfgLow) {
-          qwenParamWarnings.push(
-            t('paramCfgTooLowForNative')
-              .replace(/\{v\}/gu, String(cfgValue))
-              .replace(/\{low\}/gu, String(expectedCfgLow))
-              .replace(/\{high\}/gu, String(expectedCfgHigh)),
-          )
-        }
-        if (stepsOutOfRange) {
-          qwenParamWarnings.push(
-            t('paramStepsOutOfRange')
-              .replace(/\{v\}/gu, String(stepsValue))
-              .replace(/\{low\}/gu, String(recommendLow))
-              .replace(/\{high\}/gu, String(recommendHigh)),
-          )
-        }
-      }
 
-      // 单个输入框的标黄标记：让用户一眼看出该改哪一格
+      // 单个输入框的标黄标记：让用户一眼看出该改哪一格。
+      // 具体文案在各自 Field 的 warnText 里拼，不再集中攒一个数组。
       const qwenCfgWarn = (() => {
         if (String(draft.unet ?? '').trim() === '') return false
         const v = Number(draft.qwenCfg)
@@ -1328,7 +1365,8 @@ window.__ModuleLoader__.load({
         return turboSelected ? v > 1.5 : v < 2.5
       })()
       const qwenStepsWarn = stepsOutOfRange
-      const qwenPanelWarn = qwenParamWarnings.length > 0
+      // 折叠标题要不要标黄：两格里任一出问题就标
+      const qwenPanelWarn = qwenStepsWarn || qwenCfgWarn
 
       // 参考图上限：拿硬件推荐值和用户填的值比，超了就把输入框标红
       const hwRefLimit = typeof hw.refLimit?.auto === 'number' ? hw.refLimit.auto : null
@@ -1631,12 +1669,26 @@ window.__ModuleLoader__.load({
           type: 'number', narrow: true,
           value: draft.qwenSteps ?? 10, disabled,
           warn: qwenStepsWarn,
+          warnText: qwenStepsWarn
+            ? t('paramStepsOutOfRange')
+              .replace(/\{v\}/gu, String(stepsValue))
+              .replace(/\{low\}/gu, String(recommendLow))
+              .replace(/\{high\}/gu, String(recommendHigh))
+            : undefined,
           onChange: (v) => patch('qwenSteps', v),
         }),
         h(Field, {
           label: t('cfg'), hint: t('cfgHint'), type: 'number', narrow: true,
           value: draft.qwenCfg ?? 1, disabled,
           warn: qwenCfgWarn,
+          warnText: qwenCfgWarn
+            ? (turboSelected
+                ? t('paramCfgTooHighForTurbo').replace(/\{v\}/gu, String(Number(draft.qwenCfg)))
+                : t('paramCfgTooLowForNative')
+                  .replace(/\{v\}/gu, String(Number(draft.qwenCfg)))
+                  .replace(/\{low\}/gu, '2.5')
+                  .replace(/\{high\}/gu, '4'))
+            : undefined,
           onChange: (v) => patch('qwenCfg', v),
         }),
         h(Field, {
@@ -1649,15 +1701,6 @@ window.__ModuleLoader__.load({
           value: draft.maxRefImages ?? 2, invalid: refLimitTooHigh, disabled,
           onChange: (v) => patch('maxRefImages', v),
         }),
-        qwenParamWarnings.length > 0
-          ? h('div', { className: 'qwd-param-warn' },
-            h('div', { className: 'qwd-param-warn-title' }, t('paramWarnTitle')),
-            ...qwenParamWarnings.map((line, i) => h('div', {
-              key: `w${i}`, className: 'qwd-param-warn-item',
-            }, line)),
-            h('div', { className: 'qwd-param-warn-foot' }, t('paramWarnFoot')),
-          )
-          : null,
 
         ),
 
@@ -1954,7 +1997,9 @@ window.__ModuleLoader__.load({
         h('div', { className: 'qwd-savebar' },
           h('button', {
             type: 'button',
-            className: dirtyFields.length > 0 ? 'qwd-save-btn qwd-save-dirty' : 'qwd-save-btn',
+            className: (dirtyFields.length > 0 ? 'qwd-save-btn qwd-save-dirty' : 'qwd-save-btn')
+              // 选了不兼容的模型：按钮变红，点保存时会再确认一次
+              + (hasIncompatible ? ' qwd-save-incompatible' : ''),
             disabled: disabled || saving || dirtyFields.length === 0,
             onClick: () => { void saveAll() },
           }, saving ? t('saving') : t('saveSettings')),
@@ -1975,6 +2020,10 @@ window.__ModuleLoader__.load({
               void doReset()
             },
           }, resetArmed ? t('resetConfirm') : t('resetDefault')),
+          hasIncompatible
+            ? h('span', { className: 'qwd-save-hint', style: { color: '#cf6a5f' } },
+              t('incompatibleCount').replace('{n}', String(incompatibleFields.length)))
+            : null,
           dirtyFields.length > 0
             ? h('span', { className: 'qwd-save-hint' }, t('unsavedCount').replace('{n}', String(dirtyFields.length)))
             : null,
