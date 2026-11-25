@@ -68,7 +68,7 @@ window.__ModuleLoader__.load({
       foldBasic: 'ComfyUI 设置',
       foldBasicHint: '连接地址、自动启动、输出位置',
       detectTitle: '安装位置',
-      detectHint: '留空则扫描常见位置；填一个目录则深扫该目录。',
+      detectHint: '留空则扫描常见位置；填写则深扫该目录。',
       detectAction: '检测',
       detectOk: '已填入：{path}',
       detectNoPython: '（没找到 Python，请手动填写下面的 python 路径）',
@@ -250,7 +250,7 @@ window.__ModuleLoader__.load({
       foldBasic: 'ComfyUI',
       foldBasicHint: 'Connection, auto-start, output folder',
       detectTitle: 'Installation',
-      detectHint: 'Leave empty to scan common locations; enter a folder to scan it deeply.',
+      detectHint: 'Leave empty to scan common locations; enter one to scan deeply.',
       detectAction: 'Detect',
       detectOk: 'Filled: {path}',
       detectNoPython: '(Python not found — please fill the python path below manually)',
@@ -1593,7 +1593,7 @@ window.__ModuleLoader__.load({
         h('div', { className: 'qwd-field' },
           h('div', { className: 'qwd-field-text' },
             h('div', { className: 'qwd-label' }, t('detectTitle')),
-            h('div', { className: 'qwd-hint' }, t('detectHint')),
+            h('div', { className: 'qwd-hint qwd-hint-one-line', title: t('detectHint') }, t('detectHint')),
           ),
           h('div', { className: 'qwd-input-embedded' },
             h('input', {
@@ -1724,7 +1724,10 @@ window.__ModuleLoader__.load({
             })
             : h('div', { className: 'qwd-field' },
               h('div', { className: 'qwd-field-text' },
-                h('div', { className: 'qwd-hint' }, loadingVision ? t('visionModelLoading') : t('visionModelNone')),
+                h('div', {
+                  className: 'qwd-hint qwd-hint-one-line',
+                  title: loadingVision ? t('visionModelLoading') : t('visionModelNone'),
+                }, loadingVision ? t('visionModelLoading') : t('visionModelNone')),
               ),
             ))
           : null,
