@@ -68,18 +68,19 @@ const DEFAULTS = {
   // SDXL：单文件 checkpoint（CheckpointLoaderSimple 一次给出 model/clip/vae）
   checkpoint: '',
   // 采样参数按架构分开存：Qwen 和 SDXL 的推荐值差很多，共一份会互相踩
-  qwenSteps: 10,
+  // 默认底模是 qwen_image_2.1_int8_convrot（非 turbo 原生版），步数配它的工作点 25
+  qwenSteps: 25,
   sdxlSteps: 28,
   // Z-Image-Turbo 是 8 步蒸馏模型，CFG 固定 1（和其它蒸馏模型一样）
   zImageSteps: 8,
   zImageCfg: 1,
   // 图生图重绘强度：0.6 保留原图结构，1.0 等于整图重画
   zImageEditDenoise: 0.6,
-  // ★ CFG 默认 1.0：turbo 蒸馏模型的标准工作点。
-  //   实测 CFG 2.5 时连续图生图会逐轮过曝（3 轮平均亮度 127→162、纯白占比 0.18%→17.6%），
-  //   改成 1.0 后同样 3 轮亮度 127→122、纯白 0.34%，完全稳定，而且出图还快一倍。
-  //   （旧插件 dsh-qwen-paint 的 turbo 链用 BasicGuider，本质也是 CFG 1.0）
-  qwenCfg: 1,
+  // ★ CFG 默认 2.5：对应默认底模 qwen_image_2.1_int8_convrot（非 turbo 原生版），
+  //   官方工作点是 2.5–4，2.5 是下限、引导已经够用。
+  //   turbo 蒸馏版才用 1.0——那是为了连续图生图不逐轮过曝（实测 turbo + CFG 2.5
+  //   时 3 轮平均亮度 127→162、纯白占比 0.18%→17.6%）；非 turbo 版不受这条限制。
+  qwenCfg: 2.5,
   sdxlCfg: 7.5,
   size: '1:1',
   // 提示词按架构分开：Pony 这类模型需要专属质量标签，Qwen 不需要
@@ -482,10 +483,10 @@ const RECOMMENDED_ZIMAGE = {
 
 const RECOMMENDED_MODELS = {
   unet: {
-    file: 'qwen_image_2.1_turbo_int8_convrot.safetensors',
+    file: 'qwen_image_2.1_int8_convrot.safetensors',
     dir: 'models/diffusion_models',
-    label: 'Qwen-Image 2.1 turbo · int8',
-    note: '加速版，10 步左右出图。想更高画质可换非 turbo 版（25 步，慢一倍多）。',
+    label: 'Qwen-Image 2.1 · int8',
+    note: '原生版，25 步左右出图，画质更好。想快可换 turbo 版（10 步，速度约快一倍，画质略降）。',
   },
   clip: {
     file: 'qwen3vl_8b_w4a8.safetensors',
@@ -975,8 +976,8 @@ function buildQwenEditWorkflow(cfg, args, imageNames) {
   // 采样参数一律来自设置页；调用参数不参与（用户要求严格限制）
   const preset = SIZE_PRESETS[cfg.size] ?? SIZE_PRESETS['1:1']
   const [width, height] = preset
-  const steps = clampNumber(cfg.qwenSteps, 10, 1, 60, true)
-  const cfgScale = clampNumber(cfg.qwenCfg, 1, 1, 8)
+  const steps = clampNumber(cfg.qwenSteps, 25, 1, 60, true)
+  const cfgScale = clampNumber(cfg.qwenCfg, 2.5, 1, 8)
   const denoise = clampNumber(cfg.qwenEditDenoise, 1, 0.1, 1)
   const seed = resolveSeed(args)
 
@@ -1165,8 +1166,8 @@ function buildQwenWorkflow(cfg, args) {
   // 采样参数一律来自设置页；调用参数不参与（用户要求严格限制）
   const preset = SIZE_PRESETS[cfg.size] ?? SIZE_PRESETS['1:1']
   const [width, height] = preset
-  const steps = clampNumber(cfg.qwenSteps, 10, 1, 60, true)
-  const cfgScale = clampNumber(cfg.qwenCfg, 1, 1, 8)
+  const steps = clampNumber(cfg.qwenSteps, 25, 1, 60, true)
+  const cfgScale = clampNumber(cfg.qwenCfg, 2.5, 1, 8)
   const seed = resolveSeed(args)
 
   return {

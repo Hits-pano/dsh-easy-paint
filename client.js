@@ -1842,7 +1842,7 @@ window.__ModuleLoader__.load({
           label: t('steps'),
           hint: stepsHintText,
           type: 'number', narrow: true,
-          value: draft.qwenSteps ?? 10, disabled,
+          value: draft.qwenSteps ?? 25, disabled,
           warn: qwenStepsWarn,
           warnText: qwenStepsWarn
             ? t('paramStepsOutOfRange')
@@ -1854,7 +1854,7 @@ window.__ModuleLoader__.load({
         }),
         h(Field, {
           label: t('cfg'), hint: t('cfgHint'), type: 'number', narrow: true,
-          value: draft.qwenCfg ?? 1, disabled,
+          value: draft.qwenCfg ?? 2.5, disabled,
           warn: qwenCfgWarn,
           warnText: qwenCfgWarn
             ? (turboSelected
