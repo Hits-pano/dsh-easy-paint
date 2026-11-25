@@ -1,28 +1,50 @@
-# awesome-dsh-plugin 收录条目草稿
-# 目标文件：data/plugins/Hits-pano__dsh-qwen-draw-lite.yml
-# 提交前一天检查：仓库创建是否满 1 天（本仓库 2026-11-24 创建）
+# awesome-dsh-plugin 收录投稿
+#
+# 提交方式：给 awesome-dsh-plugin/awesome-dsh-plugin 提 PR，
+#          新增一个文件 data/plugins/Hits-pano__dsh-easy-paint.yml
+#          文件名格式：<owner>__<repo>.yml
+#
+# ---- 复制下面这段到 PR 文件里 ----
 
-url: https://github.com/Hits-pano/dsh-qwen-draw-lite
-name: Hits-pano/dsh-qwen-draw-lite
+url: https://github.com/Hits-pano/dsh-easy-paint
+name: Hits-pano/dsh-easy-paint
 category: tools
 description:
-  en: 'Generates images through a local ComfyUI instance using Qwen models, with text-to-image and reference-image editing.'
-  zh: '通过本机 ComfyUI 调用 Qwen 模型生成图片，支持文生图与参考图编辑。'
-icon: https://raw.githubusercontent.com/Hits-pano/dsh-qwen-draw-lite/main/assets/icon-180.png
-# 预构建 tarball：资产名故意不带版本号，配合 latest/download 永不失效
-tarball: https://github.com/Hits-pano/dsh-qwen-draw-lite/releases/latest/download/dsh-qwen-draw-lite.tgz
+  en: Generates images through a local ComfyUI instance with three switchable architectures — Qwen-Image, SDXL and Z-Image — covering text-to-image, instruction-based editing and LoRA chains.
+  zh: 通过本机 ComfyUI 生成图片，可在 Qwen-Image、SDXL、Z-Image 三套架构间切换，支持文生图、指令式编辑与 LoRA 链。
+icon: https://raw.githubusercontent.com/Hits-pano/dsh-easy-paint/main/assets/icon-180.png
+# 资产名不带版本号，配合 latest/download 永不失效
+tarball: https://github.com/Hits-pano/dsh-easy-paint/releases/latest/download/dsh-easy-paint.tgz
 
 # ---- 提交前检查清单 ----
-# [ ] 仓库创建满 1 天（2026-11-24 创建，11-25 之后可提交）
+#
+# [x] package.json 有 dsh.bundle（"dsh": { "bundle": { "patch": "./cordis.patch.yml" } }）
+# [x] cordis.patch.yml 在仓库根目录
+# [x] 仓库有真实可用代码（index.js 2368 行 + client.js 2333 行）
+# [x] 仓库创建满 1 天（2026-11-24 创建，11-25 已满）
+# [x] screenshots.json 在 package.json 旁边，列了 7 张截图
+# [x] 一个 PR 只加一个文件
 # [ ] 仓库加 dsh-plugin topic
-# [ ] package.json 有 dsh.bundle（已有）
-# [ ] cordis.patch.yml 在根目录（已有）
-# [ ] 描述与实际功能一致
-#   - "local ComfyUI" ✓（工作流直连 127.0.0.1:8188）
-#   - "Qwen models" ✓（模型兼容性检查 /qwen/i）
-#   - "text-to-image and reference-image editing" ✓（buildWorkflow + buildEditWorkflow）
-# [ ] 一个 PR 只加一个文件
+#
+# ---- 描述核对（会被维护者对着代码检查）----
+#
+# "local ComfyUI" ✓  工作流直连 127.0.0.1:8188，不联网
+# "three switchable architectures" ✓  ARCHITECTURES 注册表里有 3 个：
+#     qwen-image / sdxl / z-image
+# "Qwen-Image, SDXL and Z-Image" ✓  与 ARCHITECTURES 的 label 一致
+# "text-to-image" ✓  buildQwenWorkflow / buildSdxlWorkflow / buildZImageWorkflow
+# "instruction-based editing" ✓  buildQwenEditWorkflow 用 TextEncodeQwenImageEditPlus
+#     （SDXL / Z-Image 是标准重绘，所以只写 Qwen 的指令式编辑，不夸大）
+# "LoRA chains" ✓  sdxlLoraChain，最多 5 个 LoraLoader 串联
 #
 # ---- 分类说明 ----
-# 选 tools 而不是 workflow：插件本体是一个生图工具（调用 ComfyUI），
-# 不是流程编排或工作流编辑器。
+#
+# 选 tools：插件本体是一个生图工具（调用本机 ComfyUI），
+#          不是流程编排（workflow）也不是纯视觉理解（vision）。
+#          vision 分类收录的是"给纯文本模型看图"的插件（如 modlens），
+#          本插件是"把文字变成图"，性质不同。
+#
+# ---- 备注 ----
+#
+# 官方 @deepseek-ai/* 包用 peerDependencies 声明（当前 package.json 没有依赖
+# 任何 @deepseek-ai/* 包，只通过 ctx 注入获取服务，所以不需要 peerDependencies）
