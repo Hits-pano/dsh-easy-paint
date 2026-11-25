@@ -1555,8 +1555,36 @@ export function apply(ctx, rawConfig) {
 
   /* -------------------------------------------------------------- 工具 ---- */
 
-/** 出图的完整流程：工具和 HTTP 端点共用这一份逻辑 */
+/**
+ * 出图互斥：同一时刻只允许一个任务。
+ *
+ * ComfyUI 是单 GPU，同时跑多个工作流会抢显存——8 GB 的机器上两个任务并行
+ * 就可能把显存撑爆，整个队列卡死，连已经提交的任务都回不来。
+ *
+ * 这里选择「直接拒绝后到的请求」而不是排队：
+ * 排队会让用户不知道自己排第几、还要等多久；明确拒绝能让他自己决定
+ * 是等当前任务结束再来，还是改需求。
+ *
+ * 检查和置位是同步的（Node 单线程），中间没有 await，所以不存在竞态。
+ */
+let drawBusy = false
+
 async function generateImage(args, exec) {
+  if (drawBusy) {
+    throw new Error(
+      '已有生图任务正在进行，请等当前任务结束后再提交新的生图请求。'
+      + '（本机 ComfyUI 单卡同一时间只能跑一个任务，并发提交会把显存撑爆）',
+    )
+  }
+  drawBusy = true
+  try {
+    return await generateImageUnlocked(args, exec)
+  } finally {
+    drawBusy = false
+  }
+}
+
+async function generateImageUnlocked(args, exec) {
         const calledAt = Date.now()
         const cfg = currentConfig()
         const baseUrl = String(cfg.comfyUrl ?? DEFAULTS.comfyUrl).replace(/\/+$/u, '')
