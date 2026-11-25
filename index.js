@@ -1225,24 +1225,27 @@ async function comfyFetch(url, init, timeoutMs) {
 }
 
 /**
- * 让 ComfyUI 卸载模型、释放显存。
+ * 让 ComfyUI 清掉累积的缓存（KV cache、中间张量、显存碎片），但**保留模型**。
  *
- * 为什么每次出图后都要做：这台机器 8 GB 显存，Qwen 主模型 6.9 GB + 两张参考图
- * 的 KV cache 4.2 GB 已经到 11.1 GB，只能靠 ComfyUI 在显存和内存之间反复搬运
- * 来跑。实测日志里连续几个任务之间出现「0 models unloaded」——上一个任务的
- * 模型没释放就接着跑下一个，累积几次后 GPU 计算线程直接挂起（无 OOM、无报错、
- * 进程还在但 HTTP 全超时）。统计过 217 次成功记录：一张参考图成功 184 次很稳，
- * 两张参考图只撑了 23 次就挂。
+ * 为什么需要：这台机器 8 GB 显存装不下 Qwen 的完整组合（主模型 6.9 GB +
+ * 文本编码器 6 GB + VAE 0.6 GB + 两张参考图的 KV cache 4.2 GB，合计约 17.8 GB），
+ * ComfyUI 只能靠 dynamic VRAM loading 在显存和内存之间反复搬运。日志里连续
+ * 任务之间反复出现「0 models unloaded」——它判断模型没变所以不卸载，但每个任务
+ * 新建的 KV cache 和中间张量会累积，撑几次后 GPU 计算线程挂起（无 OOM、无报错、
+ * 进程还在但 HTTP 全超时）。
  *
- * 释放后下一个任务要重新加载模型（Qwen 约十几秒），换来连续出图不崩。
- * 失败静默处理：这是善后动作，不该因为它出错就把出图判失败。
+ * 统计过日志里 217 次成功记录：一张参考图成功 184 次很稳，两张只撑了 23 次。
+ *
+ * 这里只传 free_memory=true，不传 unload_models——模型本来就没完整驻留过显存，
+ * 每次重新加载既慢又没意义；真正需要清掉的是缓存。
+ * 失败静默处理：善后动作不该因为它出错就把出图判失败。
  */
-async function releaseComfyMemory(baseUrl) {
+async function flushComfyCache(baseUrl) {
   try {
     await comfyFetch(`${baseUrl}/free`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ unload_models: true, free_memory: true }),
+      body: JSON.stringify({ unload_models: false, free_memory: true }),
     }, 15000)
     return true
   } catch {
@@ -1581,9 +1584,10 @@ async function runWorkflow(baseUrl, prompt, { timeoutMs, signal }) {
     stopProgress()
     liveProgress = null
     busySince = 0
-    // 每张出完就释放模型：日志里连续任务之间出现「0 models unloaded」，
-    // 模型不卸载会在下一次任务里累积，8 GB 显卡撑几次就卡死。
-    await releaseComfyMemory(baseUrl)
+    // 每张出完清一次缓存：日志里连续任务之间出现「0 models unloaded」，
+    // KV cache 和中间张量会累积，8 GB 显卡撑几次就卡死。
+    // 只清缓存、不卸模型，下一次出图不用等重新加载。
+    await flushComfyCache(baseUrl)
   }
 }
 
