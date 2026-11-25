@@ -495,22 +495,14 @@ window.__ModuleLoader__.load({
   color: var(--dsw-alias-accent-primary, #6ba4ff);
   background: rgba(107, 164, 255, .1);
 }
-/* 选了不兼容的模型：保存按钮转红，表示「可以存，但会先确认一次」 */
-.qwd-save-incompatible,
-.qwd-save-incompatible.qwd-save-dirty,
-.qwd-save-incompatible.qwd-save-warn {
-  border-color: rgba(207, 106, 95, .7);
-  color: #cf6a5f;
-  background: rgba(207, 106, 95, .1);
-}
-/* 参数偏离推荐范围（比模型不兼容轻）：保存按钮转黄，同样会先确认 */
+/* 有预警（参数偏离或模型不兼容）时保存按钮转黄，点击会先确认一次 */
 .qwd-save-warn,
 .qwd-save-warn.qwd-save-dirty {
   border-color: rgba(224, 176, 84, .7);
   color: #e0b054;
   background: rgba(224, 176, 84, .1);
 }
-/* 最下方的预警清单：黄=参数偏离，红=模型不兼容 */
+/* 最下方的预警清单：全部用黄色，不再区分严重程度 */
 .qwd-warn-list {
   display: flex; flex-direction: column; gap: 5px;
   margin: 10px 0 4px; padding: 10px 12px;
@@ -522,8 +514,7 @@ window.__ModuleLoader__.load({
   display: flex; align-items: flex-start; gap: 8px;
   font-size: 12px; line-height: 1.6;
 }
-.qwd-warn-row-bad { color: #cf6a5f; }
-.qwd-warn-row-warn { color: #e0b054; }
+.qwd-warn-row { color: #e0b054; }
 .qwd-warn-tag {
   flex: none;
   padding: 0 6px; border-radius: 4px;
@@ -613,7 +604,6 @@ window.__ModuleLoader__.load({
   margin: -8px 0 6px; padding-right: 8px;
   font-size: 12px; line-height: 1.55;
 }
-.qwd-field-note-bad { color: #cf6a5f; }
 .qwd-field-note-warn { color: #e0b054; }
 /* 可折叠分组（手风琴） */
 .qwd-fold {
@@ -942,7 +932,7 @@ window.__ModuleLoader__.load({
           }),
         ),
         h('div', {
-          className: `qwd-field-note ${warn === true ? 'qwd-field-note-warn' : 'qwd-field-note-bad'}`,
+          className: 'qwd-field-note qwd-field-note-warn',
           style: warnText ? undefined : { display: 'none' },
         }, warnText ?? ''),
       )
@@ -1023,7 +1013,7 @@ window.__ModuleLoader__.load({
           ),
           h('select', {
             className: 'qwd-input qwd-select-wide qwd-select'
-              + (currentBad ? ' qwd-input-invalid' : ''),
+              + (currentBad ? ' qwd-input-warn' : ''),
             value: value ?? '',
             disabled: disabled === true,
             onChange: (event) => onChange(event.target.value),
@@ -1038,7 +1028,7 @@ window.__ModuleLoader__.load({
           })),
         ),
         h('div', {
-          className: 'qwd-field-note qwd-field-note-bad',
+          className: 'qwd-field-note qwd-field-note-warn',
           style: currentBad ? undefined : { display: 'none' },
         }, t('modelIncompatibleWarn')),
       )
@@ -2216,7 +2206,7 @@ window.__ModuleLoader__.load({
             className: 'qwd-save-btn'
               + (dirtyFields.length > 0 ? ' qwd-save-dirty' : '')
               // 红 > 黄 > 蓝：模型不兼容比参数越界更严重
-              + (hasIncompatible ? ' qwd-save-incompatible' : (hasParamWarn ? ' qwd-save-warn' : '')),
+              + ((hasIncompatible || hasParamWarn) ? ' qwd-save-warn' : ''),
             disabled: disabled || saving || dirtyFields.length === 0,
             onClick: requestSave,
           }, saving ? t('saving') : (saveArmed ? t('saveConfirm') : t('saveSettings'))),
@@ -2238,7 +2228,7 @@ window.__ModuleLoader__.load({
             },
           }, resetArmed ? t('resetConfirm') : t('resetDefault')),
           hasIncompatible
-            ? h('span', { className: 'qwd-save-hint', style: { color: '#cf6a5f' } },
+            ? h('span', { className: 'qwd-save-hint', style: { color: '#e0b054' } },
               t('incompatibleCount').replace('{n}', String(incompatibleFields.length)))
             : hasParamWarn
               ? h('span', { className: 'qwd-save-hint', style: { color: '#e0b054' } },
@@ -2253,7 +2243,7 @@ window.__ModuleLoader__.load({
         (hasIncompatible || hasParamWarn)
           ? h('div', { className: 'qwd-warn-list' },
             hasIncompatible
-              ? h('div', { className: 'qwd-warn-row qwd-warn-row-bad' },
+              ? h('div', { className: 'qwd-warn-row qwd-warn-row-warn' },
                 h('span', { className: 'qwd-warn-tag' }, t('warnTagBad')),
                 h('span', null, t('incompatibleSummary').replace('{n}', String(incompatibleFields.length))))
               : null,
