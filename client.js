@@ -79,6 +79,14 @@ window.__ModuleLoader__.load({
       noPython: '缺 Python',
       foldQwen: 'Qwen 设置',
       foldQwenHint: 'Qwen-Image 的主模型、文本编码器、VAE',
+      foldZImage: 'Z-Image 设置',
+      foldZImageHint: 'Z-Image-Turbo 分离式三件套（diffusion_models + text_encoders + vae）',
+      zimageNote: 'Z-Image 的文本编码器和 VAE 和 Qwen 不是同一套文件，不能混用。Turbo 版只支持文生图，8 步出图。',
+      zimagePositiveHint: '留空即可。Z-Image 不需要质量标签，用自然语言描述，它会推理；中英文文字渲染是强项。',
+      zimageStepsHint: 'Z-Image-Turbo 推荐 8 步（蒸馏模型，再多也没提升）。',
+      zimageCfgHint: 'Z-Image-Turbo 固定 1.0。调高会让负面词生效，但容易过曝。',
+      zimageEditDenoiseHint: '0.6–0.75 保留原图结构；1.0 等于整图重画。官方 Z-Image-Edit 还没发布，这里是标准重绘。',
+      archZimage: 'Z-Image',
       foldSdxl: 'SDXL 设置',
       foldSdxlHint: 'SDXL 单文件 checkpoint（models/checkpoints）',
       foldParams: '生图参数设置',
@@ -255,6 +263,14 @@ window.__ModuleLoader__.load({
       noPython: 'no Python',
       foldQwen: 'Qwen',
       foldQwenHint: 'Qwen-Image diffusion model, text encoder and VAE',
+      foldZImage: 'Z-Image',
+      foldZImageHint: 'Z-Image-Turbo split files (diffusion_models + text_encoders + vae)',
+      zimageNote: 'Z-Image uses a different text encoder and VAE than Qwen — do not mix them. The Turbo variant is text-to-image only, 8 steps.',
+      zimagePositiveHint: 'Leave empty. Z-Image needs no quality tags; describe naturally and it reasons. Strong at rendering Chinese and English text.',
+      zimageStepsHint: 'Z-Image-Turbo recommends 8 steps (distilled model, more gains little).',
+      zimageCfgHint: 'Fixed at 1.0 for Z-Image-Turbo. Raising it makes negatives apply but tends to blow out highlights.',
+      zimageEditDenoiseHint: '0.6-0.75 keeps the original structure; 1.0 repaints the whole image. Official Z-Image-Edit is not released yet, this is plain repaint.',
+      archZimage: 'Z-Image',
       foldSdxl: 'SDXL',
       foldSdxlHint: 'SDXL single-file checkpoint (models/checkpoints)',
       foldParams: 'Generation',
@@ -1405,6 +1421,7 @@ window.__ModuleLoader__.load({
           options: [
             { value: 'qwen-image', label: t('archQwen') },
             { value: 'sdxl', label: t('archSdxl') },
+            { value: 'z-image', label: t('archZimage') },
           ],
           disabled,
           onChange: (v) => { patch('arch', v)},
@@ -1783,6 +1800,86 @@ window.__ModuleLoader__.load({
         ),
 
         h(Fold, {
+          title: t('foldZImage'), sub: t('foldZImageHint'),
+          open: openFolds.zimage === true, onToggle: () => toggleFold('zimage'), dirty: panelDirty('zimage'),
+        },
+        modelsStale
+          ? h('p', { className: 'qwd-hint', style: { margin: '0 0 8px' } }, t('modelStale'))
+          : null,
+        h('div', { className: 'qwd-group-head' },
+          h('button', {
+            type: 'button', className: 'qwd-mini', disabled: disabled || refreshingModels,
+            onClick: async () => {
+              setRefreshingModels(true)
+              try { await refreshModels() } finally { setRefreshingModels(false) }
+            },
+          }, refreshingModels ? t('reloading') : t('reload')),
+        ),
+        h('p', { className: 'qwd-hint', style: { margin: '0 0 10px' } }, t('zimageNote')),
+
+        h(ModelField, {
+          label: t('unet'),
+          hint: t('unetHint'),
+          value: draft.zImageUnet ?? '',
+          options: models.unet,
+          disabled,
+          fallbackHint: t('modelFallback'), compatiblePattern: /z_image|zimage/iu,
+          t,
+          onChange: (v) => { patch('zImageUnet', v)},
+        }),
+        h(ModelField, {
+          label: t('clip'),
+          hint: t('clipHint'),
+          value: draft.zImageClip ?? '',
+          options: models.clip,
+          disabled,
+          fallbackHint: t('modelFallback'), compatiblePattern: /qwen_3_4b/iu,
+          t,
+          onChange: (v) => { patch('zImageClip', v)},
+        }),
+        h(ModelField, {
+          label: t('vae'),
+          hint: t('vaeHint'),
+          value: draft.zImageVae ?? '',
+          options: models.vae,
+          disabled,
+          fallbackHint: t('modelFallback'),
+          t,
+          onChange: (v) => { patch('zImageVae', v)},
+        }),
+
+        h(Field, {
+          label: t('positivePrompt'), hint: t('zimagePositiveHint'), type: 'textarea',
+          value: draft.zImagePositive ?? '', disabled,
+          onChange: (v) => patch('zImagePositive', v),
+        }),
+        h(Field, {
+          label: t('negativePrompt'), hint: t('negativePromptHint'), type: 'textarea',
+          value: draft.zImageNegative ?? '', disabled,
+          onChange: (v) => patch('zImageNegative', v),
+        }),
+
+        h(Field, {
+          label: t('steps'),
+          hint: t('zimageStepsHint'),
+          type: 'number', narrow: true,
+          value: draft.zImageSteps ?? 8, disabled,
+          onChange: (v) => patch('zImageSteps', v),
+        }),
+        h(Field, {
+          label: t('cfg'), hint: t('zimageCfgHint'), type: 'number', narrow: true,
+          value: draft.zImageCfg ?? 1, disabled,
+          onChange: (v) => patch('zImageCfg', v),
+        }),
+        h(Field, {
+          label: t('editDenoise'), hint: t('zimageEditDenoiseHint'), type: 'number', narrow: true,
+          value: draft.zImageEditDenoise ?? 0.6, disabled,
+          onChange: (v) => patch('zImageEditDenoise', v),
+        }),
+
+        ),
+
+        h(Fold, {
           title: t('foldAppearance'), sub: t('foldAppearanceHint'),
           open: openFolds.appearance === true, onToggle: () => toggleFold('appearance'), dirty: panelDirty('appearance'),
         },
@@ -1833,6 +1930,7 @@ const PANEL_FIELDS = {
   params: ['arch', 'size', 'autoRetry', 'selfCheck', 'selfCheckProvider', 'selfCheckModel'],
   qwen: ['unet', 'clip', 'vae', 'qwenPositive', 'qwenNegative', 'qwenSteps', 'qwenCfg', 'qwenEditDenoise', 'maxRefImages'],
   sdxl: ['checkpoint', 'sdxlPositive', 'sdxlNegative', 'sdxlSteps', 'sdxlCfg', 'sdxlEditDenoise', 'sdxlLoras'],
+  zimage: ['zImageUnet', 'zImageClip', 'zImageVae', 'zImagePositive', 'zImageNegative', 'zImageSteps', 'zImageCfg', 'zImageEditDenoise'],
   appearance: ['showStatusSeat'],
 }
 

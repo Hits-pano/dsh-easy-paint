@@ -61,11 +61,20 @@ const DEFAULTS = {
   unet: 'qwen_image_2.1_int8_convrot.safetensors',
   clip: 'qwen3vl_8b_w4a8.safetensors',
   vae: 'qwen_image_2.1_vae_bf16.safetensors',
+  // Z-Image-Turbo：也是分离式三件套，但文本编码器和 VAE 都和 Qwen 不同，不能复用
+  zImageUnet: 'z_image_turbo_int8_convrot.safetensors',
+  zImageClip: 'qwen_3_4b_fp8_mixed.safetensors',
+  zImageVae: 'ae.safetensors',
   // SDXL：单文件 checkpoint（CheckpointLoaderSimple 一次给出 model/clip/vae）
   checkpoint: '',
   // 采样参数按架构分开存：Qwen 和 SDXL 的推荐值差很多，共一份会互相踩
   qwenSteps: 10,
   sdxlSteps: 28,
+  // Z-Image-Turbo 是 8 步蒸馏模型，CFG 固定 1（和其它蒸馏模型一样）
+  zImageSteps: 8,
+  zImageCfg: 1,
+  // 图生图重绘强度：0.6 保留原图结构，1.0 等于整图重画
+  zImageEditDenoise: 0.6,
   // ★ CFG 默认 1.0：turbo 蒸馏模型的标准工作点。
   //   实测 CFG 2.5 时连续图生图会逐轮过曝（3 轮平均亮度 127→162、纯白占比 0.18%→17.6%），
   //   改成 1.0 后同样 3 轮亮度 127→122、纯白 0.34%，完全稳定，而且出图还快一倍。
@@ -76,6 +85,9 @@ const DEFAULTS = {
   // 提示词按架构分开：Pony 这类模型需要专属质量标签，Qwen 不需要
   qwenPositive: 'high quality, detailed, sharp focus',
   qwenNegative: 'blurry, low quality, distorted, watermark, overexposed, blown highlights, washed out',
+  // Z-Image 不需要质量标签，写自然语言即可；它擅长中英文文字渲染
+  zImagePositive: '',
+  zImageNegative: 'blurry, low quality, distorted, watermark, overexposed, washed out',
   sdxlPositive: 'masterpiece, best quality, high quality, detailed',
   sdxlNegative: 'blurry, low quality, distorted, watermark, overexposed, blown highlights, washed out',
   outputDir: '',
@@ -701,6 +713,21 @@ const ARCHITECTURES = {
     build: buildSdxlWorkflow,
     buildEdit: buildSdxlEditWorkflow,
   },
+  'z-image': {
+    id: 'z-image',
+    label: 'Z-Image',
+    shortLabel: 'Z-Image',
+    // 分离式三件套，但和 Qwen 不是同一套文件，所以用独立字段，切架构不丢选择
+    modelSlots: ['zImageUnet', 'zImageClip', 'zImageVae'],
+    modelKinds: ['unet', 'clip', 'vae'],
+    defaults: { steps: 8, cfg: 1 },
+    // 官方 Z-Image-Edit 还没发布，但 Turbo 可以走标准重绘做图生图
+    supportsEdit: true,
+    editKind: 'repaint',
+    editNote: '标准重绘：只能「照着这张图再画一张」，不支持「把杯子变红其他不动」这类指令',
+    build: buildZImageWorkflow,
+    buildEdit: buildZImageEditWorkflow,
+  },
 }
 
 /** 最近一次提交任务用的架构：状态座据此显示「Qwen 出图中」还是「SDXL 出图中」 */
@@ -845,7 +872,15 @@ function resolveArch(cfg) {
  */
 function assertArchModels(cfg) {
   const arch = resolveArch(cfg)
-  const labels = { unet: '主模型', clip: '文本编码器', vae: 'VAE', checkpoint: 'Checkpoint' }
+  const labels = {
+    unet: '主模型',
+    clip: '文本编码器',
+    vae: 'VAE',
+    checkpoint: 'Checkpoint',
+    zImageUnet: '主模型',
+    zImageClip: '文本编码器',
+    zImageVae: 'VAE',
+  }
   const missing = arch.modelSlots.filter((slot) => String(cfg[slot] ?? '').trim() === '')
   if (missing.length === 0) return
   const names = missing.map((slot) => labels[slot] ?? slot).join('、')
@@ -911,6 +946,128 @@ function buildQwenEditWorkflow(cfg, args, imageNames) {
   })
 
   return { width, height, steps, cfgScale, seed, denoise, prompt, edit: true, refCount: imageNames.length }
+}
+
+function zImagePosText(cfg, args) {
+  return joinPrompt(cfg.zImagePositive, args.prompt)
+}
+
+function zImageNegText(cfg) {
+  return String(cfg.zImageNegative ?? '').trim()
+}
+
+/**
+ * Z-Image-Turbo 文生图。
+ * 结构接近 Qwen（分离式三件套 + EmptySD3LatentImage），但有三处不同：
+ *   1. CLIPLoader 的 type 是 'lumina2'（不是 'qwen_image'）
+ *   2. 多一个 ModelSamplingAuraFlow（shift=3），接在 UNET 和 KSampler 之间
+ *   3. 采样器是 res_multistep / simple，8 步
+ */
+function buildZImageWorkflow(cfg, args) {
+  const preset = SIZE_PRESETS[cfg.size] ?? SIZE_PRESETS['1:1']
+  const [width, height] = preset
+  const steps = clampNumber(cfg.zImageSteps, 8, 1, 30, true)
+  const cfgScale = clampNumber(cfg.zImageCfg, 1, 1, 8)
+  const seed = resolveSeed(args)
+  // CFG=1 时负面条件完全不参与计算，用 ConditioningZeroOut 省掉一次文本编码；
+  // 用户把 CFG 调高时才有必要走真正的负面词编码。
+  const useRealNegative = cfgScale > 1
+
+  const prompt = {
+    1: { class_type: 'UNETLoader', inputs: { unet_name: cfg.zImageUnet, weight_dtype: 'default' } },
+    2: {
+      class_type: 'CLIPLoader',
+      inputs: { clip_name: cfg.zImageClip, type: 'lumina2', device: 'default' },
+    },
+    3: { class_type: 'VAELoader', inputs: { vae_name: cfg.zImageVae } },
+    4: { class_type: 'CLIPTextEncode', inputs: { clip: ['2', 0], text: zImagePosText(cfg, args) } },
+    // ModelSamplingAuraFlow 夹在 UNET 和 KSampler 之间，shift 固定 3
+    5: { class_type: 'ModelSamplingAuraFlow', inputs: { model: ['1', 0], shift: 3 } },
+    6: { class_type: 'EmptySD3LatentImage', inputs: { width, height, batch_size: 1 } },
+    7: {
+      class_type: 'KSampler',
+      inputs: {
+        model: ['5', 0],
+        positive: ['4', 0],
+        negative: useRealNegative ? ['8', 0] : ['9', 0],
+        latent_image: ['6', 0],
+        seed,
+        steps,
+        cfg: cfgScale,
+        sampler_name: 'res_multistep',
+        scheduler: 'simple',
+        denoise: 1,
+      },
+    },
+    10: { class_type: 'VAEDecode', inputs: { samples: ['7', 0], vae: ['3', 0] } },
+    11: { class_type: 'SaveImage', inputs: { images: ['10', 0], filename_prefix: 'easy-paint-zimage' } },
+  }
+
+  if (useRealNegative) {
+    prompt[8] = { class_type: 'CLIPTextEncode', inputs: { clip: ['2', 0], text: zImageNegText(cfg) } }
+  } else {
+    prompt[9] = { class_type: 'ConditioningZeroOut', inputs: { conditioning: ['4', 0] } }
+  }
+
+  return { width, height, steps, cfgScale, seed, prompt }
+}
+
+/**
+ * Z-Image-Turbo 图生图（标准重绘）。
+ * 官方 Z-Image-Edit 权重还没发布，但任何文生图模型都能走 VAEEncode + denoise 做重绘。
+ * 不支持指令式编辑（"把杯子变红其他不动"），只能「照着这张图重画」。
+ */
+function buildZImageEditWorkflow(cfg, args, imageNames) {
+  const preset = SIZE_PRESETS[cfg.size] ?? SIZE_PRESETS['1:1']
+  const [width, height] = preset
+  const steps = clampNumber(cfg.zImageSteps, 8, 1, 30, true)
+  const cfgScale = clampNumber(cfg.zImageCfg, 1, 1, 8)
+  // 重绘强度：0.6 保留原图结构，1.0 等于整图重画
+  const denoise = clampNumber(cfg.zImageEditDenoise, 0.6, 0.1, 1)
+  const seed = resolveSeed(args)
+  const useRealNegative = cfgScale > 1
+
+  const prompt = {
+    1: { class_type: 'UNETLoader', inputs: { unet_name: cfg.zImageUnet, weight_dtype: 'default' } },
+    2: {
+      class_type: 'CLIPLoader',
+      inputs: { clip_name: cfg.zImageClip, type: 'lumina2', device: 'default' },
+    },
+    3: { class_type: 'VAELoader', inputs: { vae_name: cfg.zImageVae } },
+    4: { class_type: 'CLIPTextEncode', inputs: { clip: ['2', 0], text: zImagePosText(cfg, args) } },
+    5: { class_type: 'ModelSamplingAuraFlow', inputs: { model: ['1', 0], shift: 3 } },
+    // 参考图先编码成 latent，KSampler 以它为起点配合 denoise < 1 保留结构
+    6: { class_type: 'LoadImage', inputs: { image: imageNames[0] } },
+    7: {
+      class_type: 'KSampler',
+      inputs: {
+        model: ['5', 0],
+        positive: ['4', 0],
+        negative: useRealNegative ? ['9', 0] : ['10', 0],
+        latent_image: ['8', 0],
+        seed,
+        steps,
+        cfg: cfgScale,
+        sampler_name: 'res_multistep',
+        scheduler: 'simple',
+        denoise,
+      },
+    },
+    8: { class_type: 'VAEEncode', inputs: { pixels: ['6', 0], vae: ['3', 0] } },
+    11: { class_type: 'VAEDecode', inputs: { samples: ['7', 0], vae: ['3', 0] } },
+    12: {
+      class_type: 'SaveImage',
+      inputs: { images: ['11', 0], filename_prefix: 'easy-paint-zimage-edit' },
+    },
+  }
+
+  if (useRealNegative) {
+    prompt[9] = { class_type: 'CLIPTextEncode', inputs: { clip: ['2', 0], text: zImageNegText(cfg) } }
+  } else {
+    prompt[10] = { class_type: 'ConditioningZeroOut', inputs: { conditioning: ['4', 0] } }
+  }
+
+  return { width, height, steps, cfgScale, seed, denoise, edit: true, refCount: 1, prompt }
 }
 
 function buildQwenWorkflow(cfg, args) {
@@ -1390,8 +1547,15 @@ async function generateImage(args, exec) {
         // 记下这次用的是哪个架构，状态座据此显示「Qwen 出图中」还是「SDXL 出图中」
         lastBusyArch = resolveArch(cfg).id
         const buildOnce = () => {
-          // 按当前架构分发：Qwen / SDXL 的节点图完全不同
+          // 按当前架构分发：Qwen / SDXL / Z-Image 的节点图各不相同
           const arch = resolveArch(cfg)
+          if (uploadedRefs.length > 0 && !arch.supportsEdit) {
+            // 不支持的架构别悄悄丢掉参考图，直接说清楚
+            throw new Error(
+              `${arch.label} 不支持图生图（${arch.editNote ?? '该架构只做文生图'}）。`
+              + '请切到 Qwen-Image 或 SDXL 再试，或去掉参考图按文生图出。',
+            )
+          }
           return uploadedRefs.length > 0 && arch.supportsEdit
             ? arch.buildEdit(cfg, args, uploadedRefs)
             : arch.build(cfg, args)
