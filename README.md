@@ -69,6 +69,8 @@ dsh plugin add Hits-pano/dsh-easy-paint
 | **图生图** | Qwen 是指令式编辑，SDXL / Z-Image 是标准重绘 |
 | **LoRA（SDXL）** | 最多 5 个串联，各自独立权重 |
 | **底模兼容检测** | 自动读 LoRA 元数据，判断和 Checkpoint 是否同系 |
+| **配置预警** | 步数 / CFG 偏离推荐范围、模型与架构不匹配时，输入框标黄 + 底部汇总，状态胶囊显示「配置待优化」 |
+| **模型参数记忆** | 切换主模型自动带出该模型上次保存的步数和 CFG |
 | **实时进度** | 状态胶囊显示「Qwen 出图中 4/10」「SDXL 出图中 12/28」「Z-Image 出图中 3/8」 |
 | **自动启停 ComfyUI** | 出图前探活，没启动就自动拉起 |
 | **出图自检** | 可选：开启后调用所选视觉模型检查画面；失败只提示、不丢图、不自动重画 |
@@ -129,11 +131,11 @@ Z-Image-Turbo 分离式三件套。带推荐模型表格，标出本机装了哪
 
 ## 支持的架构
 
-| 架构 | 模型格式 | 步数 | 图生图方式 |
+| 架构 | 模型格式 | 默认步数 / CFG | 图生图方式 |
 |---|---|---|---|
-| **Qwen-Image** | 分离式（UNET + CLIP + VAE） | 10 | 指令式编辑，能理解「把背景换成海边」 |
-| **SDXL** | 单文件 checkpoint | 28 | 标准重绘，只能「照着这张图再画一张」 |
-| **Z-Image** | 分离式（diffusion + text encoder + VAE） | 8 | 标准重绘（同 SDXL） |
+| **Qwen-Image** | 分离式（UNET + CLIP + VAE） | 25 / 2.5（原生）· 10 / 1（turbo） | 指令式编辑，能理解「把背景换成海边」 |
+| **SDXL** | 单文件 checkpoint | 28 / 7.5 | 标准重绘，只能「照着这张图再画一张」 |
+| **Z-Image** | 分离式（diffusion + text encoder + VAE） | 8 / 1 | 标准重绘（同 SDXL） |
 
 **SDXL 系**包括 SDXL 1.0、Illustrious、Pony、NoobAI 等所有基于 SDXL 架构微调的模型。
 
@@ -224,6 +226,10 @@ mklink /J "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-easy-paint" "
 | 主模型 | `qwen_image_2.1_int8_convrot.safetensors` | `models/diffusion_models/` |
 | 文本编码器 | `qwen3vl_8b_w4a8.safetensors` | `models/text_encoders/` |
 | VAE | `qwen_image_2.1_vae_bf16.safetensors` | `models/vae/` |
+
+默认用上面这套**原生版**（25 步 / CFG 2.5）。想快可以换 turbo 版
+`qwen_image_2.1_turbo_int8_convrot.safetensors`（10 步 / CFG 1），
+画质略降；切换主模型时插件会自动带出对应参数。
 
 **SDXL（按风格选）**
 
@@ -368,6 +374,33 @@ Z-Image 架构 —— 独立体系，目前没有 LoRA 生态
 ### Qwen 设置
 
 主模型、文本编码器、VAE、推荐模型表格、采样参数、提示词、参考图上限。
+
+默认底模是非 turbo 的原生 int8，配套 **25 步 / CFG 2.5**；换成
+`qwen_image_2.1_turbo_int8_convrot` 时插件会自动切到 **10 步 / CFG 1**。
+
+### 配置预警
+
+参数或模型选得不对时，插件会提前提示，而不是等出图失败才发现。
+
+| 架构 | CFG 推荐 | 步数推荐 |
+|---|---|---|
+| Qwen-Image（原生） | 2.5 – 4 | 20 – 30 |
+| Qwen-Image（turbo） | 1 | 8 – 12 |
+| SDXL | 7 – 8 | 25 – 30 |
+| Z-Image-Turbo | 1 | 6 – 12 |
+
+超出范围时：
+
+1. 输入框变黄边，下方给出一句具体说明（独占一行，不会打断输入）
+2. 设置页底部汇总所有预警
+3. 保存按钮变黄，第一次点击只把文字换成「确认保存？」，再点一次才写盘
+4. 对话框状态胶囊显示黄色「配置待优化」
+
+**点状态胶囊可以在「配置待优化」和「无视预警」之间切换**，再点一次确认无视，
+胶囊恢复正常外观，可以照常出图。参数改好后预警自动消失。
+
+模型下拉会列出本机所有模型，不属于当前架构的标「⚠ 不兼容」，仍可选中——
+文件名判断不一定准，所以不剥夺你的选择权。
 
 ### SDXL 设置
 
