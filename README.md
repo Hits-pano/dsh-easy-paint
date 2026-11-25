@@ -106,21 +106,44 @@ Z-Image-Turbo 分离式三件套。带推荐模型表格，标出本机装了哪
 
 ## 安装
 
-### 1. 克隆到工作区
+### 方式一：命令行（推荐）
+
+```bash
+dsh plugin add Hits-pano/dsh-easy-paint
+```
+
+或手动克隆：
 
 ```bash
 cd /path/to/your/workspace
 git clone https://github.com/Hits-pano/dsh-easy-paint.git
 ```
 
-### 2. 链接到 DSH profile
+### 方式二：下载预构建包
+
+从 [Releases](https://github.com/Hits-pano/dsh-easy-paint/releases/latest) 下载：
+
+| 格式 | 大小 | 适合 |
+|---|---|---|
+| `dsh-easy-paint.zip` | 1.6 MB | **Windows 手动安装**（双击解压） |
+| `dsh-easy-paint.tgz` | 1.1 MB | 命令行 / 插件市场 |
+
+**Windows 手动安装步骤**：
+
+1. 下载 `dsh-easy-paint.zip`，解压
+2. 把里面的 `package` 文件夹重命名为 `dsh-easy-paint`
+3. 复制到 `%USERPROFILE%\.dsh\profiles\desktop\node_modules\`
+4. 编辑 `%USERPROFILE%\.dsh\profiles\desktop\package.json`，在 `dsh.profile.bundles` 里加上 `dsh-easy-paint`
+5. 重启 DSH
+
+### 链接到 DSH profile（源码安装时）
 
 ```powershell
 # Windows：用 Junction（不需要管理员权限）
 mklink /J "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-easy-paint" "D:\path\to\dsh-easy-paint"
 ```
 
-### 3. 在 profile 里启用
+### 在 profile 里启用
 
 编辑 `~/.dsh/profiles/desktop/package.json`：
 
@@ -140,7 +163,7 @@ mklink /J "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-easy-paint" "
 }
 ```
 
-### 4. 重启 DSH
+### 重启 DSH
 
 插件加载后，设置里会出现「Easy Paint」。
 
