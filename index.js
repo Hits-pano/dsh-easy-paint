@@ -1,5 +1,5 @@
 /**
- * qwen-draw-lite · Host 侧
+ * easy-paint · Host 侧
  *
  * 直接和本机 ComfyUI 的 HTTP API 打交道，不依赖任何 DSH 内部包
  * （本地插件经 Junction 安装，Node 从工作区解析，找不到 app.asar 里的包）。
@@ -7,17 +7,17 @@
  *
  * 配置分三层，后者覆盖前者：
  *   1. DEFAULTS（本文件常量）
- *   2. cordis.patch.yml 里 qwen-draw-lite.config（部署基线）
- *   3. <home>/.dsh/qwen-draw-lite/config.json（设置页写入，改完立即生效，不用重启）
+ *   2. cordis.patch.yml 里 easy-paint.config（部署基线）
+ *   3. <home>/.dsh/easy-paint/config.json（设置页写入，改完立即生效，不用重启）
  */
 import { execFile, spawn } from 'node:child_process'
 import { existsSync, openSync } from 'node:fs'
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, writeFile, open } from 'node:fs/promises'
 import net from 'node:net'
 import { homedir } from 'node:os'
 import { dirname, basename, join } from 'node:path'
 
-export const name = 'qwen-draw-lite'
+export const name = 'easy-paint'
 export const inject = ['tools']
 
 /** 画幅 → 像素。边长均为 16 的倍数，总像素贴近 1MP。 */
@@ -33,17 +33,29 @@ const SIZE_PRESETS = {
 
 const DEFAULTS = {
   comfyUrl: 'http://127.0.0.1:8188',
+  // 模型架构：'qwen-image' 或 'sdxl'。决定用哪套节点图。
+  arch: 'qwen-image',
+  // Qwen-Image：分离式三件套
   unet: 'qwen_image_2.1_int8_convrot.safetensors',
   clip: 'qwen3vl_8b_w4a8.safetensors',
   vae: 'qwen_image_2.1_vae_bf16.safetensors',
-  steps: 25,
+  // SDXL：单文件 checkpoint（CheckpointLoaderSimple 一次给出 model/clip/vae）
+  checkpoint: '',
+  // 采样参数按架构分开存：Qwen 和 SDXL 的推荐值差很多，共一份会互相踩
+  qwenSteps: 10,
+  sdxlSteps: 28,
   // ★ CFG 默认 1.0：turbo 蒸馏模型的标准工作点。
   //   实测 CFG 2.5 时连续图生图会逐轮过曝（3 轮平均亮度 127→162、纯白占比 0.18%→17.6%），
   //   改成 1.0 后同样 3 轮亮度 127→122、纯白 0.34%，完全稳定，而且出图还快一倍。
   //   （旧插件 dsh-qwen-paint 的 turbo 链用 BasicGuider，本质也是 CFG 1.0）
-  cfg: 1.0,
+  qwenCfg: 1,
+  sdxlCfg: 7.5,
   size: '1:1',
-  negative: 'blurry, low quality, distorted, watermark, overexposed, blown highlights, washed out',
+  // 提示词按架构分开：Pony 这类模型需要专属质量标签，Qwen 不需要
+  qwenPositive: 'high quality, detailed, sharp focus',
+  qwenNegative: 'blurry, low quality, distorted, watermark, overexposed, blown highlights, washed out',
+  sdxlPositive: 'masterpiece, best quality, high quality, detailed',
+  sdxlNegative: 'blurry, low quality, distorted, watermark, overexposed, blown highlights, washed out',
   outputDir: '',
   timeoutMs: 600000,
   // 出图前若连不上 ComfyUI，就用这三个字段把它拉起来。
@@ -52,6 +64,9 @@ const DEFAULTS = {
   comfyPython: 'C:\\Software\\ComfyUI\\ComfyUI\\ComfyUI\\.venv\\Scripts\\python.exe',
   comfyMainPy: 'C:\\Software\\ComfyUI\\ComfyUI\\ComfyUI\\main.py',
   comfyWorkdir: 'C:\\Software\\ComfyUI\\ComfyUI\\ComfyUI',
+  // 模型目录。留空则用 <comfyWorkdir>/models；填了就完全按这个路径找。
+  // 填的是 models 目录本身，不是它的父目录。
+  modelsDir: '',
   startupTimeoutMs: 240000,
   // 端口被占用但 HTTP 不通时，最多等多久（覆盖「别人正在启动」的场景，又不至于死等异常占用）
   portWaitMs: 60000,
@@ -67,7 +82,17 @@ const DEFAULTS = {
   //   1.0 = 从纯噪声整图重画：编辑能力完整（能改颜色/换背景），但链式迭代会累积过曝；
   //   0.6-0.8 = 保留原图 latent：迭代稳定，但改动幅度很小（改不了整体颜色）。
   // 默认 1.0 保证"能改"是首要的；需要连续迭代时再手动调低。
-  editDenoise: 1.0,
+  qwenEditDenoise: 1,
+  sdxlEditDenoise: 0.6,
+  // SDXL 的 LoRA 链：[{ name: 'xxx.safetensors', strength: 0.8 }, ...]
+  // 按顺序串进工作流，最多 5 个
+    sdxlLoras: [
+    { name: '', strength: 0.8 },
+    { name: '', strength: 0.8 },
+    { name: '', strength: 0.8 },
+    { name: '', strength: 0.8 },
+    { name: '', strength: 0.8 },
+  ],
   // 是否在对话输入框右侧显示 ComfyUI 状态胶囊（关闭后仍可用设置页顶部控制条操作）
   showStatusSeat: true,
   // 出图自检：off = 不自检 / light = 轻量（尺寸+文件大小）/ vision = 视觉模型检查
@@ -77,16 +102,17 @@ const DEFAULTS = {
   selfCheckModel: '/models/Qwen3-Omni-30B-A3B-Instruct',
 }
 
-const COMFY_LOG = join(homedir(), '.dsh', 'qwen-draw-lite', 'comfyui.log')
+const COMFY_LOG = join(homedir(), '.dsh', 'easy-paint', 'comfyui.log')
 
-const CONFIG_PATH = '/api/qwen-draw-lite/config'
-const STATUS_PATH = '/api/qwen-draw-lite/status'
-const MODELS_PATH = '/api/qwen-draw-lite/models'
-const LAUNCH_PATH = '/api/qwen-draw-lite/launch'
-const STOP_PATH = '/api/qwen-draw-lite/stop'
-const VISION_MODELS_PATH = '/api/qwen-draw-lite/vision-models'
-const DETECT_PATH = '/api/qwen-draw-lite/detect'
-const STATE_DIR = join(homedir(), '.dsh', 'qwen-draw-lite')
+const CONFIG_PATH = '/api/easy-paint/config'
+const STATUS_PATH = '/api/easy-paint/status'
+const MODELS_PATH = '/api/easy-paint/models'
+const LAUNCH_PATH = '/api/easy-paint/launch'
+const STOP_PATH = '/api/easy-paint/stop'
+const VISION_MODELS_PATH = '/api/easy-paint/vision-models'
+const DETECT_PATH = '/api/easy-paint/detect'
+const DRAW_PATH = '/api/easy-paint/draw'
+const STATE_DIR = join(homedir(), '.dsh', 'easy-paint')
 const STATE_FILE = join(STATE_DIR, 'config.json')
 // 模型列表缓存：ComfyUI 关着时设置页仍然有下拉可选，不用逼用户手打文件名
 const MODELS_CACHE_FILE = join(STATE_DIR, 'models-cache.json')
@@ -109,7 +135,7 @@ function resolveConfig(patchConfig, fileConfig) {
 
 function resolveOutputDir(cfg) {
   const raw = typeof cfg.outputDir === 'string' ? cfg.outputDir.trim() : ''
-  return raw === '' ? join(homedir(), 'Desktop', '千问绘图') : raw
+  return raw === '' ? join(homedir(), 'Desktop', 'Easy Paint') : raw
 }
 
 /* ------------------------------------------------------------ HTTP 小工具 ---- */
@@ -214,7 +240,7 @@ async function visionCheck(services, buffer, prompt, cfg) {
 
   let ref
   try {
-    const refs = await store.saveImages([{ data: buffer, mediaType: 'image/png', name: 'qwen-draw-lite-selfcheck.png' }])
+    const refs = await store.saveImages([{ data: buffer, mediaType: 'image/png', name: 'easy-paint-selfcheck.png' }])
     ref = refs[0]
   } catch (error) {
     return { mode: 'vision', ok: true, skipped: true, issues: [`图片存入附件失败：${error?.message ?? error}`] }
@@ -474,13 +500,364 @@ async function uploadImage(baseUrl, localPath) {
  *   （实测 3 轮亮度 127→168、纯白占比 0.18%→24%）。
  *   改成 VAEEncode + 0.75 后同样 3 轮亮度仅 127→128.7、纯白 1.49%。
  */
-function buildEditWorkflow(cfg, args, imageNames) {
+/**
+ * SDXL 文生图：单文件 checkpoint 同时提供 model / clip / vae。
+ * CheckpointLoaderSimple 的输出：0 = MODEL，1 = CLIP，2 = VAE。
+ * 采样参数是 SDXL 的常规取值（28 步 / CFG 7.5 / dpmpp_2m + karras）。
+ */
+/**
+ * 往工作流里串 LoRA 链：每个 LoRA 接上一环的 (model, clip) 输出。
+ * 返回最后一环的 [modelRef, clipRef] 与实际用上的个数。
+ */
+function sdxlLoraChain(prompt, startModel, startClip, loras, checkpointName) {
+  let modelRef = startModel
+  let clipRef = startClip
+  const metaMap = modelsCache?.loraMeta ?? {}
+  const list = Array.isArray(loras)
+    ? loras.filter((l) => {
+      if (!l || String(l.name ?? '').trim() === '') return false
+      // SD1.5 的 LoRA 在 SDXL 底模上根本加载不了，直接跳过，避免白跑一趟
+      const fam = metaMap[l.name]?.family ?? 'unknown'
+      if (fam === 'sd15') return false
+      return true
+    })
+    : []
+  // 节点 id 从 30 起，避开主链 1-9 和参考图 20+
+  list.slice(0, 5).forEach((lora, index) => {
+    const id = String(30 + index)
+    const raw = Number(lora.strength)
+    const strength = Number.isFinite(raw) ? Math.min(Math.max(raw, 0), 2) : 0.8
+    prompt[id] = {
+      class_type: 'LoraLoader',
+      inputs: {
+        model: modelRef,
+        clip: clipRef,
+        lora_name: String(lora.name),
+        strength_model: strength,
+        strength_clip: strength,
+      },
+    }
+    modelRef = [id, 0]
+    clipRef = [id, 1]
+  })
+  return { modelRef, clipRef, count: Math.min(list.length, 5) }
+}
+
+function buildSdxlWorkflow(cfg, args) {
+  const preset = SIZE_PRESETS[cfg.size] ?? SIZE_PRESETS['1:1']
+  const [width, height] = preset
+  const steps = Math.min(Math.max(Math.trunc(Number(cfg.sdxlSteps) || 28), 1), 60)
+  const cfgScale = Math.min(Math.max(Number(cfg.sdxlCfg) || 7.5, 1), 20)
+  const seed = Number.isFinite(Number(args.seed))
+    ? Math.trunc(Number(args.seed))
+    : Math.floor(Math.random() * 1e15)
+
+  const prompt = {
+    1: { class_type: 'CheckpointLoaderSimple', inputs: { ckpt_name: cfg.checkpoint } },
+  }
+  // 串上 LoRA 链（没配 LoRA 时 modelRef/clipRef 就是 checkpoint 的直出）
+  const { modelRef, clipRef } = sdxlLoraChain(prompt, ['1', 0], ['1', 1], cfg.sdxlLoras, cfg.checkpoint)
+
+  Object.assign(prompt, {
+    2: { class_type: 'CLIPTextEncode', inputs: { clip: clipRef, text: sdxlPosText(cfg, args) } },
+    3: { class_type: 'CLIPTextEncode', inputs: { clip: clipRef, text: sdxlNegText(cfg) } },
+    // SDXL 是 4 通道 latent，用 EmptyLatentImage（不是 Qwen 的 EmptySD3LatentImage）
+    4: { class_type: 'EmptyLatentImage', inputs: { width, height, batch_size: 1 } },
+    5: {
+      class_type: 'KSampler',
+      inputs: {
+        model: modelRef,
+        positive: ['2', 0],
+        negative: ['3', 0],
+        latent_image: ['4', 0],
+        seed,
+        steps,
+        cfg: cfgScale,
+        sampler_name: 'dpmpp_2m',
+        scheduler: 'karras',
+        denoise: 1,
+      },
+    },
+    6: { class_type: 'VAEDecode', inputs: { samples: ['5', 0], vae: ['1', 2] } },
+    7: {
+      class_type: 'SaveImage',
+      inputs: { images: ['6', 0], filename_prefix: 'easy-paint-sdxl' },
+    },
+  })
+
+  return { width, height, steps, cfgScale, seed, prompt }
+}
+
+/**
+ * SDXL 图生图：VAEEncode 参考图作 latent + denoise < 1 保留原图结构。
+ *
+ * ⚠ 和 Qwen 的关键差异：SDXL 没有 TextEncodeQwenImageEditPlus 那种指令式编辑节点，
+ *   只能「照着这张图重画一张」，不理解「把背景换成海边」这类指令。
+ *   只取第一张参考图，不支持多图融合。
+ */
+function buildSdxlEditWorkflow(cfg, args, imageNames) {
+  const preset = SIZE_PRESETS[cfg.size] ?? SIZE_PRESETS['1:1']
+  const [width, height] = preset
+  const steps = Math.min(Math.max(Math.trunc(Number(cfg.sdxlSteps) || 28), 1), 60)
+  const cfgScale = Math.min(Math.max(Number(cfg.sdxlCfg) || 7.5, 1), 20)
+  // SDXL 重绘默认值比 Qwen 低：太高会变成整图重画
+  const denoise = Math.min(Math.max(Number(cfg.sdxlEditDenoise) || 0.6, 0.1), 1)
+  const seed = Number.isFinite(Number(args.seed))
+    ? Math.trunc(Number(args.seed))
+    : Math.floor(Math.random() * 1e15)
+
+  const prompt = {
+    1: { class_type: 'CheckpointLoaderSimple', inputs: { ckpt_name: cfg.checkpoint } },
+    2: { class_type: 'LoadImage', inputs: { image: imageNames[0] } },
+    3: { class_type: 'VAEEncode', inputs: { pixels: ['2', 0], vae: ['1', 2] } },
+  }
+  // 图生图同样串 LoRA 链
+  const { modelRef, clipRef } = sdxlLoraChain(prompt, ['1', 0], ['1', 1], cfg.sdxlLoras, cfg.checkpoint)
+  Object.assign(prompt, {
+    4: { class_type: 'CLIPTextEncode', inputs: { clip: clipRef, text: sdxlPosText(cfg, args) } },
+    5: { class_type: 'CLIPTextEncode', inputs: { clip: clipRef, text: sdxlNegText(cfg) } },
+    6: {
+      class_type: 'KSampler',
+      inputs: {
+        model: modelRef,
+        positive: ['4', 0],
+        negative: ['5', 0],
+        latent_image: ['3', 0],
+        seed,
+        steps,
+        cfg: cfgScale,
+        sampler_name: 'dpmpp_2m',
+        scheduler: 'karras',
+        denoise,
+      },
+    },
+    7: { class_type: 'VAEDecode', inputs: { samples: ['6', 0], vae: ['1', 2] } },
+    8: {
+      class_type: 'SaveImage',
+      inputs: { images: ['7', 0], filename_prefix: 'easy-paint-sdxl-edit' },
+    },
+  })
+
+  return { width, height, steps, cfgScale, seed, denoise, edit: true, refCount: 1, prompt }
+}
+
+/**
+ * 模型架构注册表。
+ *
+ * 每个架构声明：显示名、需要哪些模型槽位、默认采样参数、工作流构建函数。
+ * 新增一个架构 = 在这里加一个对象 + 写 build/buildEdit 两个函数，
+ * 其余（ComfyUI 通信、启动、自检、进度、路由）全部复用，不需要动。
+ */
+const ARCHITECTURES = {
+  'qwen-image': {
+    id: 'qwen-image',
+    label: 'Qwen-Image',
+      shortLabel: 'Qwen',
+    // 设置页要显示哪些模型字段
+    modelSlots: ['unet', 'clip', 'vae'],
+    // models 端点要查哪些 ComfyUI 加载器节点
+    modelKinds: ['unet', 'clip', 'vae'],
+    defaults: { steps: 10, cfg: 1 },
+    supportsEdit: true,
+    editKind: 'instruction',
+    editNote: '支持指令式编辑：能理解「把背景换成海边」这类描述',
+    build: buildQwenWorkflow,
+    buildEdit: buildQwenEditWorkflow,
+  },
+  sdxl: {
+    id: 'sdxl',
+    label: 'SDXL',
+      shortLabel: 'SDXL',
+    modelSlots: ['checkpoint'],
+    modelKinds: ['checkpoints'],
+    defaults: { steps: 28, cfg: 7.5 },
+    supportsEdit: true,
+    editKind: 'repaint',
+    editNote: '标准重绘：只能「照着这张图再画一张」，不支持指令式编辑',
+    build: buildSdxlWorkflow,
+    buildEdit: buildSdxlEditWorkflow,
+  },
+}
+
+/** 最近一次提交任务用的架构：状态座据此显示「Qwen 出图中」还是「SDXL 出图中」 */
+let lastBusyArch = ''
+
+/** 把默认正面词拼到用户描述前面；没填就直接用描述 */
+function joinPrompt(prefix, prompt) {
+  const head = String(prefix ?? '').trim()
+  const body = String(prompt ?? '').trim()
+  if (head === '') return body
+  if (body === '') return head
+  return `${head}, ${body}`
+}
+
+function qwenPosText(cfg, args) {
+  return joinPrompt(cfg.qwenPositive, args.prompt)
+}
+
+function qwenNegText(cfg) {
+  return String(cfg.qwenNegative ?? '')
+}
+
+function sdxlPosText(cfg, args) {
+  return joinPrompt(cfg.sdxlPositive, args.prompt)
+}
+
+function sdxlNegText(cfg) {
+  return String(cfg.sdxlNegative ?? '')
+}
+
+/**
+ * 直接扫 ComfyUI 的 models 目录列文件，不依赖 ComfyUI 是否运行。
+ * 新旧目录名都兼容（diffusion_models / unet，text_encoders / clip）。
+ */
+const MODEL_FILE_RE = /\.(safetensors|ckpt|pt|pth|bin|gguf)$/i
+
+const MODEL_SUBDIRS = {
+  unet: ['diffusion_models', 'unet'],
+  clip: ['text_encoders', 'clip'],
+  vae: ['vae'],
+  checkpoints: ['checkpoints'],
+  loras: ['loras'],
+}
+
+async function listFromDisk(modelsRoot, subs) {
+  const out = []
+  for (const sub of subs) {
+    const dir = join(modelsRoot, sub)
+    try {
+      const entries = await readdir(dir, { withFileTypes: true })
+      for (const entry of entries) {
+        if (entry.isFile() && MODEL_FILE_RE.test(entry.name)) {
+          out.push(entry.name)
+        } else if (entry.isDirectory()) {
+          // ComfyUI 支持 models/loras/子目录/文件，往里再扫一层
+          try {
+            const inner = await readdir(join(dir, entry.name), { withFileTypes: true })
+            for (const f of inner) {
+              if (f.isFile() && MODEL_FILE_RE.test(f.name)) out.push(entry.name + "/" + f.name)
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+  }
+  return Array.from(new Set(out)).sort((a, b) => a.localeCompare(b))
+}
+
+/** 解析 models 目录的绝对路径：优先用自定义 modelsDir，否则 <comfyWorkdir>/models */
+function resolveModelsDir(cfg) {
+  const custom = String(cfg?.modelsDir ?? '').trim()
+  if (custom !== '') return custom
+  const root = comfyRoot(cfg)
+  return root === '' ? '' : join(root, 'models')
+}
+
+/** 从配置推导 ComfyUI 根目录 */
+function comfyRoot(cfg) {
+  const workdir = String(cfg?.comfyWorkdir ?? '').trim()
+  if (workdir !== '') return workdir
+  const mainPy = String(cfg?.comfyMainPy ?? '').trim()
+  if (mainPy !== '') return dirname(mainPy)
+  return ''
+}
+
+/**
+ * 读 LoRA 文件（safetensors）头部的 __metadata__.ss_base_model_version。
+ * 多数 Civitai / A1111 训练出来的 LoRA 带这个字段；没有就返回空串。
+ * header 格式：前 8 字节小端 uint64 = JSON 字节长度，紧接着是 JSON。
+ */
+async function readLoraBaseModel(filePath) {
+  try {
+    const handle = await open(filePath, 'r')
+    try {
+      const lenBuf = Buffer.alloc(8)
+      await handle.read(lenBuf, 0, 8, 0)
+      const headerLen = Number(lenBuf.readBigUInt64LE(0))
+      if (!Number.isFinite(headerLen) || headerLen <= 0 || headerLen > 50 * 1024 * 1024) {
+        return { raw: '', dbg: 'badHeaderLen=' + headerLen + ' path=' + filePath }
+      }
+      const headerBuf = Buffer.alloc(headerLen)
+      const r = await handle.read(headerBuf, 0, headerLen, 8)
+      const header = JSON.parse(headerBuf.toString('utf8'))
+      const meta = header?.__metadata__ ?? {}
+      // 优先级：具体底模名 > 架构版本 > modelspec 架构。
+      // ss_sd_model_name 记的是训练时用的具体底模（如 Illustrious-XL-v1.0），
+      // ss_base_model_version 只是架构级（sdxl_base_v1-0），粗一档会漏掉变体。
+      const raw = meta.ss_sd_model_name
+        ?? meta.ss_base_model_version
+        ?? meta['modelspec.architecture']
+        ?? ''
+      const strs = typeof raw === 'string' ? raw : ''
+      if (strs === '') {
+        return {
+          raw: '',
+          dbg: 'noField headerLen=' + headerLen
+            + ' bytesRead=' + r.bytesRead
+            + ' metaKeys=' + Object.keys(meta).length
+            + ' hasSdName=' + ('ss_sd_model_name' in meta)
+            + ' path=' + filePath,
+        }
+      }
+      return { raw: strs, dbg: 'ok path=' + filePath }
+    } finally {
+      await handle.close()
+    }
+  } catch (error) {
+    return { raw: '', dbg: 'ERR=' + (error?.message ?? error) + ' path=' + filePath }
+  }
+}
+
+/** 把底模标识归一成 illustrious / pony / noob / sdxl / sd15 / unknown */
+function normalizeBaseModel(raw) {
+  const s = String(raw ?? '').toLowerCase()
+  if (s === '') return 'unknown'
+  if (s.includes('illustrious')) return 'illustrious'
+  if (s.includes('pony')) return 'pony'
+  if (s.includes('noob')) return 'noob'
+  if (s.includes('sdxl') || s.includes('sd_xl')) return 'sdxl'
+  if (s.includes('anything')) return 'sd15'
+  if (s.includes('sd_v1') || s.includes('sd1') || s.includes('sd_1') || s.includes('1.5')) return 'sd15'
+  return 'unknown'
+}
+
+/** 从 checkpoint 文件名猜它属于哪一系 */
+function checkpointFamily(name) {
+  const s = String(name ?? '').toLowerCase()
+  if (s.includes('illustrious')) return 'illustrious'
+  if (s.includes('pony')) return 'pony'
+  if (s.includes('noob')) return 'noob'
+  return 'sdxl'
+}
+
+/** 取架构定义，非法值回落到 Qwen-Image */
+function resolveArch(cfg) {
+  return ARCHITECTURES[cfg?.arch] ?? ARCHITECTURES['qwen-image']
+}
+
+/**
+ * 出图前检查当前架构需要的模型字段有没有填。
+ * 不检查的话会把空字符串塞进工作流，ComfyUI 那边报的错很难懂。
+ */
+function assertArchModels(cfg) {
+  const arch = resolveArch(cfg)
+  const labels = { unet: '主模型', clip: '文本编码器', vae: 'VAE', checkpoint: 'Checkpoint' }
+  const missing = arch.modelSlots.filter((slot) => String(cfg[slot] ?? '').trim() === '')
+  if (missing.length === 0) return
+  const names = missing.map((slot) => labels[slot] ?? slot).join('、')
+  throw new Error(
+    `当前架构是 ${arch.label}，但还没选模型：${names}。`
+    + '请到 DSH 设置 → Easy Paint → 模型设置里选择，然后重试。',
+  )
+}
+
+function buildQwenEditWorkflow(cfg, args, imageNames) {
   // 采样参数一律来自设置页；调用参数不参与（用户要求严格限制）
   const preset = SIZE_PRESETS[cfg.size] ?? SIZE_PRESETS['1:1']
   const [width, height] = preset
-  const steps = Math.min(Math.max(Math.trunc(Number(cfg.steps) || 25), 1), 60)
-  const cfgScale = Math.min(Math.max(Number(cfg.cfg) || 2.5, 1), 8)
-  const denoise = Math.min(Math.max(Number(cfg.editDenoise) || 1, 0.1), 1)
+  const steps = Math.min(Math.max(Math.trunc(Number(cfg.qwenSteps) || 10), 1), 60)
+  const cfgScale = Math.min(Math.max(Number(cfg.qwenCfg) || 1, 1), 8)
+  const denoise = Math.min(Math.max(Number(cfg.qwenEditDenoise) || 1, 0.1), 1)
   const seed = Number.isFinite(Number(args.seed))
     ? Math.trunc(Number(args.seed))
     : Math.floor(Math.random() * 1e15)
@@ -493,13 +870,13 @@ function buildEditWorkflow(cfg, args, imageNames) {
       class_type: 'TextEncodeQwenImageEditPlus',
       inputs: {
         clip: ['2', 0],
-        prompt: String(args.prompt ?? ''),
+        prompt: qwenPosText(cfg, args),
         vae: ['3', 0],
       },
     },
     5: {
       class_type: 'CLIPTextEncode',
-      inputs: { clip: ['2', 0], text: String(cfg.negative ?? '') },
+      inputs: { clip: ['2', 0], text: qwenNegText(cfg) },
     },
     // latent 用参考图本身编码（不是空 latent）：配合 denoise < 1 保留原图，
     // 避免"整图重画"导致的逐轮过曝。实测 denoise 0.75 连续 3 轮亮度仅 +0.5。
@@ -520,7 +897,7 @@ function buildEditWorkflow(cfg, args, imageNames) {
       },
     },
     8: { class_type: 'VAEDecode', inputs: { samples: ['7', 0], vae: ['3', 0] } },
-    9: { class_type: 'SaveImage', inputs: { images: ['8', 0], filename_prefix: 'qwen-draw-lite-edit' } },
+    9: { class_type: 'SaveImage', inputs: { images: ['8', 0], filename_prefix: 'easy-paint-edit' } },
   }
 
   // 每张参考图挂一个 LoadImage，接进 TextEncodeQwenImageEditPlus 的 imageN
@@ -534,12 +911,12 @@ function buildEditWorkflow(cfg, args, imageNames) {
   return { width, height, steps, cfgScale, seed, denoise, prompt, edit: true, refCount: imageNames.length }
 }
 
-function buildWorkflow(cfg, args) {
+function buildQwenWorkflow(cfg, args) {
   // 采样参数一律来自设置页；调用参数不参与（用户要求严格限制）
   const preset = SIZE_PRESETS[cfg.size] ?? SIZE_PRESETS['1:1']
   const [width, height] = preset
-  const steps = Math.min(Math.max(Math.trunc(Number(cfg.steps) || 25), 1), 60)
-  const cfgScale = Math.min(Math.max(Number(cfg.cfg) || 2.5, 1), 8)
+  const steps = Math.min(Math.max(Math.trunc(Number(cfg.qwenSteps) || 10), 1), 60)
+  const cfgScale = Math.min(Math.max(Number(cfg.qwenCfg) || 1, 1), 8)
   const seed = Number.isFinite(Number(args.seed))
     ? Math.trunc(Number(args.seed))
     : Math.floor(Math.random() * 1e15)
@@ -554,10 +931,10 @@ function buildWorkflow(cfg, args) {
       1: { class_type: 'UNETLoader', inputs: { unet_name: cfg.unet, weight_dtype: 'default' } },
       2: { class_type: 'CLIPLoader', inputs: { clip_name: cfg.clip, type: 'qwen_image' } },
       3: { class_type: 'VAELoader', inputs: { vae_name: cfg.vae } },
-      4: { class_type: 'CLIPTextEncode', inputs: { clip: ['2', 0], text: String(args.prompt) } },
+      4: { class_type: 'CLIPTextEncode', inputs: { clip: ['2', 0], text: qwenPosText(cfg, args) } },
       5: {
         class_type: 'CLIPTextEncode',
-        inputs: { clip: ['2', 0], text: String(cfg.negative ?? '') },
+        inputs: { clip: ['2', 0], text: qwenNegText(cfg) },
       },
       6: { class_type: 'EmptySD3LatentImage', inputs: { width, height, batch_size: 1 } },
       7: {
@@ -576,7 +953,7 @@ function buildWorkflow(cfg, args) {
         },
       },
       8: { class_type: 'VAEDecode', inputs: { samples: ['7', 0], vae: ['3', 0] } },
-      9: { class_type: 'SaveImage', inputs: { images: ['8', 0], filename_prefix: 'qwen-draw-lite' } },
+      9: { class_type: 'SaveImage', inputs: { images: ['8', 0], filename_prefix: 'easy-paint' } },
     },
   }
 }
@@ -875,7 +1252,7 @@ async function ensureComfy(cfg) {
 }
 
 async function runWorkflow(baseUrl, prompt, { timeoutMs, signal }) {
-  const clientId = `qwen-draw-lite-${Date.now()}`
+  const clientId = `easy-paint-${Date.now()}`
   const res = await comfyFetch(`${baseUrl}/prompt`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -934,7 +1311,7 @@ async function saveImage(baseUrl, image, outputDir) {
   const buffer = Buffer.from(await res.arrayBuffer())
   await mkdir(outputDir, { recursive: true })
   const stamp = new Date().toISOString().replace(/[:.]/gu, '-').slice(0, 19)
-  const file = join(outputDir, `qwen-draw-lite-${stamp}-${image.filename ?? 'out.png'}`)
+  const file = join(outputDir, `easy-paint-${stamp}-${image.filename ?? 'out.png'}`)
   await writeFile(file, buffer)
   return file
 }
@@ -974,9 +1351,139 @@ export function apply(ctx, rawConfig) {
 
   /* -------------------------------------------------------------- 工具 ---- */
 
+/** 出图的完整流程：工具和 HTTP 端点共用这一份逻辑 */
+async function generateImage(args, exec) {
+        const calledAt = Date.now()
+        const cfg = currentConfig()
+        const baseUrl = String(cfg.comfyUrl ?? DEFAULTS.comfyUrl).replace(/\/+$/u, '')
+        // 离线就先拉起来再提交，省得用户自己去开 ComfyUI
+        const beforeStart = Date.now()
+        await ensureComfy(cfg)
+        const startupSeconds = Math.round((Date.now() - beforeStart) / 1000)
+  
+        // 收集参考图：image（单张）与 images（数组）合并、去重、最多 3 张
+        const refPaths = []
+        const single = typeof args.image === 'string' ? args.image.trim() : ''
+        if (single !== '') refPaths.push(single)
+        if (Array.isArray(args.images)) {
+          for (const item of args.images) {
+            if (typeof item === 'string' && item.trim() !== '') refPaths.push(item.trim())
+          }
+        }
+        const uniqueRefs = [...new Set(refPaths)]
+        // ★ 硬上限 = min(用户配置, 按显存自动推算)，超过的部分直接丢弃，
+        //   否则会撑爆显存把任务卡死（8 GB 下 3 张实测必卡）
+        const refLimit = resolveRefLimit(cfg, hardwareCache)
+        const maxRefs = refLimit.effective
+        const usedRefs = uniqueRefs.slice(0, maxRefs)
+        const ignoredRefs = uniqueRefs.length - usedRefs.length
+  
+        // 参考图只需上传一次，多张抽卡复用同一批文件名
+        let uploadedRefs = []
+        if (usedRefs.length > 0) {
+          for (const localPath of usedRefs) {
+            uploadedRefs.push(await uploadImage(baseUrl, localPath))
+          }
+        }
+        // 先确认当前架构的模型字段都填了，不然空字符串塞进工作流会报难懂的错
+        assertArchModels(cfg)
+        // 记下这次用的是哪个架构，状态座据此显示「Qwen 出图中」还是「SDXL 出图中」
+        lastBusyArch = resolveArch(cfg).id
+        const buildOnce = () => {
+          // 按当前架构分发：Qwen / SDXL 的节点图完全不同
+          const arch = resolveArch(cfg)
+          return uploadedRefs.length > 0 && arch.supportsEdit
+            ? arch.buildEdit(cfg, args, uploadedRefs)
+            : arch.build(cfg, args)
+        }
+  
+        const timeoutMs = Math.max(Number(cfg.timeoutMs) || 600000, 30000)
+        const outputDir = resolveOutputDir(cfg)
+        const checkMode = String(cfg.selfCheck ?? 'off')
+  
+        // 自动重试次数：0 = 只出一张；N = 连出 1+N 张（各自不同随机种子）供挑选
+        const retryMax = Math.max(0, Math.min(5, Math.trunc(Number(cfg.autoRetry)) || 0))
+        const total = 1 + retryMax
+        const shots = []
+        let lastWorkflow = null
+  
+        for (let index = 0; index < total; index += 1) {
+          // 每次重新构建工作流 → 未指定 seed 时自然抽到新种子
+          const workflow = buildOnce()
+          lastWorkflow = workflow
+          const images = await runWorkflow(baseUrl, workflow.prompt, { timeoutMs, signal: exec?.signal })
+          const file = await saveImage(baseUrl, images[0], outputDir)
+  
+          // 图生图的尺寸由参考图决定（VAEEncode 用原图 latent），不是配置的画幅；
+          // 这里用实际输出尺寸覆盖，免得工具报告和真实文件对不上
+          let outputBuffer = null
+          try {
+            outputBuffer = await readFile(file)
+            const actual = pngSize(outputBuffer)
+            if (actual !== null) {
+              workflow.width = actual.width
+              workflow.height = actual.height
+            }
+          } catch {
+            // 读不出来就沿用构建时的值，不阻断出图
+          }
+  
+          // 出图自检：按配置执行，任何失败都只记录不阻断——图已经出来了
+          let selfCheck = { mode: 'off', ok: true, issues: [] }
+          let selfCheckSeconds = 0
+          if (checkMode === 'light' || checkMode === 'vision') {
+            const checkStart = Date.now()
+            selfChecking = true
+            try {
+              const buffer = outputBuffer ?? await readFile(file)
+              selfCheck = checkMode === 'vision'
+                ? await visionCheck(checkServices, buffer, String(args.prompt ?? ''), cfg)
+                : lightCheck(buffer, workflow)
+            } catch (error) {
+              selfCheck = { mode: checkMode, ok: true, skipped: true, issues: [`自检执行失败：${error?.message ?? error}`] }
+            } finally {
+              selfChecking = false
+              selfCheckSeconds = Math.round((Date.now() - checkStart) / 1000)
+            }
+          }
+  
+          shots.push({ path: file, seed: workflow.seed, selfCheck, selfCheckSeconds })
+          // 多张之间留一点间隔，避免把 ComfyUI 队列挤爆
+          if (index + 1 < total) await sleep(300)
+        }
+  
+        // 调用方传了已停用的采样参数：这些值被忽略，如实说明，别让用户以为设置没生效
+        const ignoredArgs = []
+        if (args.steps !== undefined) ignoredArgs.push('steps')
+        if (args.cfg !== undefined) ignoredArgs.push('cfg')
+        if (args.size !== undefined) ignoredArgs.push('size')
+        if (args.negative !== undefined) ignoredArgs.push('negative')
+  
+        const first = shots[0]
+        return {
+          path: first.path,
+          paths: shots.map((shot) => shot.path),
+          seeds: shots.map((shot) => shot.seed),
+          checks: shots.map((shot) => shot.selfCheck),
+          width: lastWorkflow.width,
+          height: lastWorkflow.height,
+          steps: lastWorkflow.steps,
+          cfg: lastWorkflow.cfgScale,
+          seed: first.seed,
+          // 从被调用那一刻算起，含启动等待，用户看到的就是真实等待时长
+          seconds: Math.round((Date.now() - calledAt) / 1000),
+          startupSeconds,
+          refCount: usedRefs.length,
+          ignoredRefs,
+          selfCheck: first.selfCheck,
+          selfCheckSeconds: shots.reduce((sum, shot) => sum + shot.selfCheckSeconds, 0),
+          ignoredArgs,
+        }
+}
+
   ctx.tools.register({
-    name: 'qwen_draw',
-    description: '用本机 ComfyUI 的千问模型生成一张图片，返回图片绝对路径与本次采样参数。',
+    name: 'draw_image',
+    description: '用本机 ComfyUI 生成一张图片，返回图片绝对路径与本次采样参数。当前支持的架构见设置页。',
     parameters: {
       prompt: {
         type: 'string',
@@ -994,20 +1501,20 @@ export function apply(ctx, rawConfig) {
       },
       size: {
         type: 'string',
-        description: '已停用。画幅一律使用设置页的值，传了会被忽略。用户要求改画幅时，请让他到 DSH 设置 → Qwen Draw 修改。',
+        description: '已停用。画幅一律使用设置页的值，传了会被忽略。用户要求改画幅时，请让他到 DSH 设置 → Easy Paint 修改。',
       },
       steps: {
         type: 'integer',
-        description: '已停用。采样步数一律使用设置页「生成默认值」里的值，传了会被忽略。用户要求改步数时，请让他到 DSH 设置 → Qwen Draw 修改。',
+        description: '已停用。采样步数一律使用设置页「生成默认值」里的值，传了会被忽略。用户要求改步数时，请让他到 DSH 设置 → Easy Paint 修改。',
       },
       cfg: {
         type: 'number',
-        description: '已停用。CFG 一律使用设置页的值，传了会被忽略。用户要求改 CFG 时，请让他到 DSH 设置 → Qwen Draw 修改。',
+        description: '已停用。CFG 一律使用设置页的值，传了会被忽略。用户要求改 CFG 时，请让他到 DSH 设置 → Easy Paint 修改。',
       },
       seed: { type: 'integer', description: '随机种子。不填则随机——通常不要传。' },
       negative: {
         type: 'string',
-        description: '已停用。负面词一律使用设置页的值，传了会被忽略。用户要求改负面词时，请让他到 DSH 设置 → Qwen Draw 修改。',
+        description: '已停用。负面词一律使用设置页的值，传了会被忽略。用户要求改负面词时，请让他到 DSH 设置 → Easy Paint 修改。',
       },
     },
     timeoutMs: 600000,
@@ -1082,7 +1589,7 @@ export function apply(ctx, rawConfig) {
         }
         // 调用方传了已停用的采样参数：明确告诉用户这些被忽略了、该去哪儿改
         const ignoredText = Array.isArray(value.ignoredArgs) && value.ignoredArgs.length > 0
-          ? `〔注意：${value.ignoredArgs.join(' / ')} 参数已忽略——采样设置以设置页为准（当前 ${value.steps} 步 / CFG ${value.cfg} / ${value.width}×${value.height}）。要改请到 DSH 设置 → Qwen Draw〕`
+          ? `〔注意：${value.ignoredArgs.join(' / ')} 参数已忽略——采样设置以设置页为准（当前 ${value.steps} 步 / CFG ${value.cfg} / ${value.width}×${value.height}）。要改请到 DSH 设置 → Easy Paint〕`
           : ''
 
         // 多张抽卡：逐张列出路径与自检结论，让用户自己挑
@@ -1098,7 +1605,7 @@ export function apply(ctx, rawConfig) {
         if (list !== '') {
           return [{
             type: 'text',
-            text: `已出图 ${value.paths.length} 张（${mode}，${value.width}×${value.height}，${value.steps} 步 / CFG ${value.cfg}，共用时 ${value.seconds}s${startup}）：\n${list}\n${dropped}${ignoredText}〔可用上面的路径挑选满意的一张；想改重试次数请到 DSH 设置 → Qwen Draw〕`,
+            text: `已出图 ${value.paths.length} 张（${mode}，${value.width}×${value.height}，${value.steps} 步 / CFG ${value.cfg}，共用时 ${value.seconds}s${startup}）：\n${list}\n${dropped}${ignoredText}〔可用上面的路径挑选满意的一张；想改重试次数请到 DSH 设置 → Easy Paint〕`,
           }]
         }
 
@@ -1110,124 +1617,7 @@ export function apply(ctx, rawConfig) {
     },
     isConcurrencySafe: () => false,
     async execute(args, exec) {
-      const calledAt = Date.now()
-      const cfg = currentConfig()
-      const baseUrl = String(cfg.comfyUrl ?? DEFAULTS.comfyUrl).replace(/\/+$/u, '')
-      // 离线就先拉起来再提交，省得用户自己去开 ComfyUI
-      const beforeStart = Date.now()
-      await ensureComfy(cfg)
-      const startupSeconds = Math.round((Date.now() - beforeStart) / 1000)
-
-      // 收集参考图：image（单张）与 images（数组）合并、去重、最多 3 张
-      const refPaths = []
-      const single = typeof args.image === 'string' ? args.image.trim() : ''
-      if (single !== '') refPaths.push(single)
-      if (Array.isArray(args.images)) {
-        for (const item of args.images) {
-          if (typeof item === 'string' && item.trim() !== '') refPaths.push(item.trim())
-        }
-      }
-      const uniqueRefs = [...new Set(refPaths)]
-      // ★ 硬上限 = min(用户配置, 按显存自动推算)，超过的部分直接丢弃，
-      //   否则会撑爆显存把任务卡死（8 GB 下 3 张实测必卡）
-      const refLimit = resolveRefLimit(cfg, hardwareCache)
-      const maxRefs = refLimit.effective
-      const usedRefs = uniqueRefs.slice(0, maxRefs)
-      const ignoredRefs = uniqueRefs.length - usedRefs.length
-
-      // 参考图只需上传一次，多张抽卡复用同一批文件名
-      let uploadedRefs = []
-      if (usedRefs.length > 0) {
-        for (const localPath of usedRefs) {
-          uploadedRefs.push(await uploadImage(baseUrl, localPath))
-        }
-      }
-      const buildOnce = () => (uploadedRefs.length > 0
-        ? buildEditWorkflow(cfg, args, uploadedRefs)
-        : buildWorkflow(cfg, args))
-
-      const timeoutMs = Math.max(Number(cfg.timeoutMs) || 600000, 30000)
-      const outputDir = resolveOutputDir(cfg)
-      const checkMode = String(cfg.selfCheck ?? 'off')
-
-      // 自动重试次数：0 = 只出一张；N = 连出 1+N 张（各自不同随机种子）供挑选
-      const retryMax = Math.max(0, Math.min(5, Math.trunc(Number(cfg.autoRetry)) || 0))
-      const total = 1 + retryMax
-      const shots = []
-      let lastWorkflow = null
-
-      for (let index = 0; index < total; index += 1) {
-        // 每次重新构建工作流 → 未指定 seed 时自然抽到新种子
-        const workflow = buildOnce()
-        lastWorkflow = workflow
-        const images = await runWorkflow(baseUrl, workflow.prompt, { timeoutMs, signal: exec?.signal })
-        const file = await saveImage(baseUrl, images[0], outputDir)
-
-        // 图生图的尺寸由参考图决定（VAEEncode 用原图 latent），不是配置的画幅；
-        // 这里用实际输出尺寸覆盖，免得工具报告和真实文件对不上
-        let outputBuffer = null
-        try {
-          outputBuffer = await readFile(file)
-          const actual = pngSize(outputBuffer)
-          if (actual !== null) {
-            workflow.width = actual.width
-            workflow.height = actual.height
-          }
-        } catch {
-          // 读不出来就沿用构建时的值，不阻断出图
-        }
-
-        // 出图自检：按配置执行，任何失败都只记录不阻断——图已经出来了
-        let selfCheck = { mode: 'off', ok: true, issues: [] }
-        let selfCheckSeconds = 0
-        if (checkMode === 'light' || checkMode === 'vision') {
-          const checkStart = Date.now()
-          selfChecking = true
-          try {
-            const buffer = outputBuffer ?? await readFile(file)
-            selfCheck = checkMode === 'vision'
-              ? await visionCheck(checkServices, buffer, String(args.prompt ?? ''), cfg)
-              : lightCheck(buffer, workflow)
-          } catch (error) {
-            selfCheck = { mode: checkMode, ok: true, skipped: true, issues: [`自检执行失败：${error?.message ?? error}`] }
-          } finally {
-            selfChecking = false
-            selfCheckSeconds = Math.round((Date.now() - checkStart) / 1000)
-          }
-        }
-
-        shots.push({ path: file, seed: workflow.seed, selfCheck, selfCheckSeconds })
-        // 多张之间留一点间隔，避免把 ComfyUI 队列挤爆
-        if (index + 1 < total) await sleep(300)
-      }
-
-      // 调用方传了已停用的采样参数：这些值被忽略，如实说明，别让用户以为设置没生效
-      const ignoredArgs = []
-      if (args.steps !== undefined) ignoredArgs.push('steps')
-      if (args.cfg !== undefined) ignoredArgs.push('cfg')
-      if (args.size !== undefined) ignoredArgs.push('size')
-      if (args.negative !== undefined) ignoredArgs.push('negative')
-
-      const first = shots[0]
-      return {
-        path: first.path,
-        paths: shots.map((shot) => shot.path),
-        seeds: shots.map((shot) => shot.seed),
-        checks: shots.map((shot) => shot.selfCheck),
-        width: lastWorkflow.width,
-        height: lastWorkflow.height,
-        steps: lastWorkflow.steps,
-        cfg: lastWorkflow.cfgScale,
-        seed: first.seed,
-        // 从被调用那一刻算起，含启动等待，用户看到的就是真实等待时长
-        seconds: Math.round((Date.now() - calledAt) / 1000),
-        startupSeconds,
-        refCount: usedRefs.length,
-        ignoredRefs,
-        selfCheck: first.selfCheck,
-        selfCheckSeconds: shots.reduce((sum, shot) => sum + shot.selfCheckSeconds, 0),
-        ignoredArgs,
-      }
+      return await generateImage(args, exec)
     },
   })
 
@@ -1248,6 +1638,8 @@ export function apply(ctx, rawConfig) {
           defaults: DEFAULTS,
           sizes: Object.keys(SIZE_PRESETS),
           stateFile: STATE_FILE,
+          // 自动推导出的 models 目录（modelsDir 为空时用它），供前端做输入框占位提示
+          resolvedModelsDir: resolveModelsDir(currentConfig()),
         })
         return
       }
@@ -1306,6 +1698,10 @@ export function apply(ctx, rawConfig) {
     respondJson(res, 200, {
       ok: true,
       endpoint: baseUrl,
+      arch: lastBusyArch,
+      archLabel: lastBusyArch === ''
+        ? ''
+        : (ARCHITECTURES[lastBusyArch]?.shortLabel ?? ARCHITECTURES[lastBusyArch]?.label ?? ''),
       online: health.online === true,
       version: health.version ?? '',
       ...(health.online ? {} : { reason: health.reason }),
@@ -1327,6 +1723,35 @@ export function apply(ctx, rawConfig) {
     })
   }
 
+  /** HTTP 版出图：给不方便走 tool 调用的场景用（本机请求才放行） */
+  const onDraw = async (req, res) => {
+    if (!isLocalRequest(req)) {
+      respondJson(res, 403, { ok: false, error: '只接受本机请求' })
+      return
+    }
+    if (req.method !== 'POST') {
+      res.writeHead(405, { Allow: 'POST' })
+      res.end()
+      return
+    }
+    try {
+      const body = await readJsonBody(req)
+      const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : ''
+      if (prompt === '') {
+        respondJson(res, 400, { ok: false, error: 'prompt 不能为空' })
+        return
+      }
+      const args = { prompt }
+      if (typeof body?.image === 'string' && body.image.trim() !== '') args.image = body.image.trim()
+      if (Array.isArray(body?.images)) args.images = body.images.filter((x) => typeof x === 'string')
+      if (Number.isFinite(Number(body?.seed))) args.seed = Math.trunc(Number(body.seed))
+      const result = await generateImage(args)
+      respondJson(res, 200, { ok: true, ...result })
+    } catch (error) {
+      respondJson(res, 500, { ok: false, error: error?.message ?? String(error) })
+    }
+  }
+
   const onModels = async (req, res) => {
     if (!isLocalRequest(req)) {
       respondJson(res, 403, { ok: false, error: '只接受本机请求' })
@@ -1341,18 +1766,54 @@ export function apply(ctx, rawConfig) {
     const baseUrl = String(cfg.comfyUrl ?? DEFAULTS.comfyUrl).replace(/\/+$/u, '')
     const health = await checkComfy(baseUrl)
 
-    // 离线时用缓存：切模型是写配置，不需要 ComfyUI 在线，不该逼用户手打文件名
-    if (!health.online) {
-      if (modelsCache) {
-        respondJson(res, 200, {
-          ok: true,
-          stale: true,
-          reason: health.reason,
-          ...modelsCache,
-          recommended: RECOMMENDED_MODELS,
-        })
-        return
+    // 优先直接扫磁盘：切模型只是写配置，不该依赖 ComfyUI 是否运行。
+    // 扫到东西就直接返回，扫不到（路径没配 / 目录不存在）再退回 ComfyUI 或缓存。
+    try {
+      const modelsRoot = resolveModelsDir(cfg)
+      if (modelsRoot !== '') {
+        const [unet, clip, vae, checkpoints, loras] = await Promise.all([
+          listFromDisk(modelsRoot, MODEL_SUBDIRS.unet),
+          listFromDisk(modelsRoot, MODEL_SUBDIRS.clip),
+          listFromDisk(modelsRoot, MODEL_SUBDIRS.vae),
+          listFromDisk(modelsRoot, MODEL_SUBDIRS.checkpoints),
+          listFromDisk(modelsRoot, MODEL_SUBDIRS.loras),
+        ])
+        const total = unet.length + clip.length + vae.length + checkpoints.length + loras.length
+        if (total > 0) {
+          const loraMeta = {}
+          const loraDir = join(modelsRoot, 'loras')
+          for (const name of loras) {
+            const full = join(loraDir, ...name.split('/'))
+            const got = await readLoraBaseModel(full)
+            loraMeta[name] = { raw: got.raw, family: normalizeBaseModel(got.raw), dbg: got.dbg }
+          }
+          const next = { unet, clip, vae, checkpoints, loras, loraMeta }
+          modelsCache = next
+          void saveModelsCache(next)
+          respondJson(res, 200, {
+            ok: true,
+            stale: false,
+            source: 'disk',
+            ...next,
+            recommended: RECOMMENDED_MODELS,
+          })
+          return
+        }
       }
+    } catch {}
+
+    // 磁盘扫不到就退回缓存（ComfyUI 也不必在线）
+    if (modelsCache) {
+      respondJson(res, 200, {
+        ok: true,
+        stale: true,
+        reason: health.online ? 'disk empty' : health.reason,
+        ...modelsCache,
+        recommended: RECOMMENDED_MODELS,
+      })
+      return
+    }
+    if (!health.online) {
       respondJson(res, 200, {
         ok: false,
         error: `ComfyUI 未运行，也没有可用的缓存列表（${health.reason}）`,
@@ -1369,15 +1830,40 @@ export function apply(ctx, rawConfig) {
       return list.filter((item) => typeof item === 'string' && /\.[a-z0-9]+$/iu.test(item))
     }
     try {
-      const [unetData, clipData, vaeData] = await Promise.all([
+      const [unetData, clipData, vaeData, ckptData, loraData] = await Promise.all([
         comfyFetch(`${baseUrl}/object_info/UNETLoader`, {}, 15000).then((r) => r.json()),
         comfyFetch(`${baseUrl}/object_info/CLIPLoader`, {}, 15000).then((r) => r.json()),
         comfyFetch(`${baseUrl}/object_info/VAELoader`, {}, 15000).then((r) => r.json()),
+        comfyFetch(`${baseUrl}/object_info/CheckpointLoaderSimple`, {}, 15000).then((r) => r.json()),
+        comfyFetch(`${baseUrl}/object_info/LoraLoader`, {}, 15000).then((r) => r.json()),
       ])
       const next = {
         unet: pick(unetData, 'UNETLoader', 'unet_name'),
         clip: pick(clipData, 'CLIPLoader', 'clip_name'),
         vae: pick(vaeData, 'VAELoader', 'vae_name'),
+        // SDXL 等单文件 checkpoint 走这个加载器
+        checkpoints: pick(ckptData, 'CheckpointLoaderSimple', 'ckpt_name'),
+        loras: pick(loraData, 'LoraLoader', 'lora_name'),
+        // 每个 LoRA 的底模标识，供前端做「和 Checkpoint 是否同系」的提示
+        loraMeta: await (async () => {
+          const names = pick(loraData, 'LoraLoader', 'lora_name')
+          const out = {}
+          if (names.length === 0) return out
+          const cfg = currentConfig()
+          const root = String(cfg.comfyWorkdir || '').trim()
+            || (String(cfg.comfyMainPy || '').trim() !== '' ? dirname(String(cfg.comfyMainPy)) : '')
+          if (root === '') {
+            for (const name of names) out[name] = { raw: '', family: 'unknown' }
+            return out
+          }
+          const loraDir = join(root, 'models', 'loras')
+          for (const name of names) {
+            const full = join(loraDir, ...name.split('/'))
+            const got = await readLoraBaseModel(full)
+            out[name] = { raw: got.raw, family: normalizeBaseModel(got.raw), dbg: got.dbg }
+          }
+          return out
+        })(),
       }
       modelsCache = next
       void saveModelsCache(next)
@@ -1672,9 +2158,10 @@ export function apply(ctx, rawConfig) {
           webCtx.webServer.register({ kind: 'exact', path: STOP_PATH, handler: onStop }),
           webCtx.webServer.register({ kind: 'exact', path: VISION_MODELS_PATH, handler: onVisionModels }),
           webCtx.webServer.register({ kind: 'exact', path: DETECT_PATH, handler: onDetect }),
+    webCtx.webServer.register({ kind: 'exact', path: DRAW_PATH, handler: onDraw }),
         ]
         return () => { for (const dispose of disposers) dispose() }
-      }, 'qwen-draw-lite: config, status, models, launch, stop and vision-models routes')
+      }, 'easy-paint: config, status, models, launch, stop and vision-models routes')
     })
   }
 }

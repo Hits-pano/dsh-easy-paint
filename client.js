@@ -1,21 +1,21 @@
 window.__ModuleLoader__.load({
-  id: 'dsh-qwen-draw-lite',
+  id: 'dsh-easy-paint',
   factory(require) {
     const React = require('react')
     const h = React.createElement
     const NS = 'settings.qwenDraw'
 
-    const API_CONFIG = 'api/qwen-draw-lite/config'
-    const API_STATUS = 'api/qwen-draw-lite/status'
-    const API_MODELS = 'api/qwen-draw-lite/models'
-    const API_LAUNCH = 'api/qwen-draw-lite/launch'
-    const API_STOP = 'api/qwen-draw-lite/stop'
-    const API_VISION_MODELS = 'api/qwen-draw-lite/vision-models'
-    const API_DETECT = 'api/qwen-draw-lite/detect'
+    const API_CONFIG = 'api/easy-paint/config'
+    const API_STATUS = 'api/easy-paint/status'
+    const API_MODELS = 'api/easy-paint/models'
+    const API_LAUNCH = 'api/easy-paint/launch'
+    const API_STOP = 'api/easy-paint/stop'
+    const API_VISION_MODELS = 'api/easy-paint/vision-models'
+    const API_DETECT = 'api/easy-paint/detect'
 
     const zh = {
-      title: 'Qwen Draw Lite',
-      lead: '本机 ComfyUI + 千问原生工作点。下面的改动即时保存并立即生效，不用重启。',
+      title: 'Easy Paint',
+      lead: '通过本机 ComfyUI 出图，支持切换模型架构。',
       connOnline: 'ComfyUI 在线',
       connOffline: 'ComfyUI 离线',
       recheck: '重新检测',
@@ -27,9 +27,28 @@ window.__ModuleLoader__.load({
       comfyMainPy: 'main.py 路径',
       comfyMainPyHint: 'ComfyUI 的启动入口文件。',
       comfyWorkdir: '工作目录',
+      modelsDir: '模型文件路径',
+      modelsDirHint: '填 models 目录本身，留空则用「工作目录/models」。填了可以不启动 ComfyUI 直接读模型列表。',
       comfyWorkdirHint: '留空则用 main.py 所在目录。',
       seatStarting: '启动中…',
       models: '模型文件',
+      archLabel: '模型架构',
+      archHint: '决定用哪套 ComfyUI 工作流。换架构后要重新选模型，采样参数默认值也不同。',
+      archQwen: 'Qwen-Image',
+      archSdxl: 'SDXL',
+      checkpoint: 'Checkpoint',
+      checkpointHint: 'models/checkpoints 里的单文件模型',
+      sdxlEditNote: 'SDXL 的图生图是标准重绘：只能「照着这张图再画一张」，不理解「把背景换成海边」这类指令。如果想要指令式编辑，请用 Qwen-Image 架构。',
+      sdxlStepsHint: 'SDXL 通常 25–30 步。太少会糊，再多收益递减。',
+      sdxlCfgHint: 'SDXL 通常 7–8。低于 5 出图会发灰、不跟提示词。',
+      sdxlEditDenoiseHint: '0.6–0.75 保留原图结构；1.0 等于整图重画。',
+      sdxlRecTitle: '常见 SDXL 模型',
+      sdxlRecBase: '官方基准，最稳，适合先跑通链路',
+      sdxlRecReal: '写实向，人像和场景光影质量高',
+      sdxlRecAnime: '动漫向，提示词写法和普通 SDXL 一样',
+      sdxlRecHint: '放进 models/checkpoints 后点上面的「刷新模型列表」。',
+      copyModelHint: '点击复制模型名',
+      copyModelDone: '模型名已复制',
       unet: '主模型',
       unetHint: 'models/diffusion_models 下的文件名。',
       clip: '文本编码器',
@@ -58,8 +77,10 @@ window.__ModuleLoader__.load({
       scanNone: '这个目录下没找到 ComfyUI（需要同时有 main.py 和 comfy/ 或 custom_nodes/）。',
       hasPython: '有 Python',
       noPython: '缺 Python',
-      foldModels: '模型设置',
-      foldModelsHint: '主模型、文本编码器、VAE',
+      foldQwen: 'Qwen 设置',
+      foldQwenHint: 'Qwen-Image 的主模型、文本编码器、VAE',
+      foldSdxl: 'SDXL 设置',
+      foldSdxlHint: 'SDXL 单文件 checkpoint（models/checkpoints）',
       foldParams: '生图参数设置',
       foldParamsHint: '画幅、重试、负面词、出图自检',
       foldAdvanced: '高级设置',
@@ -76,6 +97,34 @@ window.__ModuleLoader__.load({
       cfgHint: '提示词引导强度。turbo 模型建议 1.0——实测 2.5 时连续图生图会逐轮过曝（3 轮纯白占比 0.18%→17.6%），1.0 下完全稳定且更快。',
       size: '默认画幅',
       negative: '默认负面词',
+      positivePrompt: '默认正面提示词',
+      positivePromptHint: '出图时拼在你的描述前面。留空则只用你自己的描述。',
+      negativePrompt: '默认负面提示词',
+      negativePromptHint: '出图时作为 negative 送进去，用来压制不想要的东西。',
+      sdxlPositiveHint: 'SDXL 系模型常用 masterpiece, best quality 这类质量词。留空则只用你自己的描述。',
+      sdxlNegativeHint: '出图时作为 negative 送进去，用来压制不想要的东西。',
+      loraTitle: 'LoRA（可选，最多 5 个）',
+      loraHint: '按顺序串进工作流。权重 0.6–1.0 常见，超过 1 可能过拟合。',
+      loraAdd: '添加 LoRA',
+      loraPick: '选择 LoRA 文件',
+      loraEmpty: '还没有添加 LoRA。',
+      loraRemove: '移除这一条',
+      loraSlotEmpty: '（空）',
+      loraRowHint: '留空即不用',
+      loraRowNote: '（留空不使用）',
+      loraLoaded: '已装载',
+      loraIncompatible: '不兼容，LoRA 未生效',
+      loraCross: '跨系 LoRA，效果可能不佳',
+      loraCrossTitle: '这个 LoRA 是为 {lora} 训练的，当前 Checkpoint 属于 {cp}。能加载，但风格和细节会打折。',
+      loraNoMeta: '文件里没写底模信息，无法判断兼容性',
+      loraNoCkpt: '未选底模，兼容性未知',
+      loraMissing: '文件已失效',
+      loraMissingTitle: '配置里记的这个文件名在 models/loras 下已经找不到了（可能被改名或删除）。请重新选一个，或把它从槽位里清掉。',
+      loraNoCkptTitle: '先在上面选一个 Checkpoint，才能判断这个 LoRA 是否同系',
+      loraMismatch: '⚠ 和 Checkpoint 不同系',
+      loraSd15Warn: '⚠ 这是 SD1.5 的 LoRA，SDXL 用不了',
+      loraMismatchTitle: '这个 LoRA 是为 {lora} 训练的，当前 Checkpoint 属于 {cp}。混用效果会打折。',
+      loraStrengthHint: '权重 0–2，0.8 常用',
       outputDir: '输出目录',
       outputDirHint: '留空则用 桌面\\千问绘图。',
       machine: '本机参数',
@@ -101,12 +150,20 @@ window.__ModuleLoader__.load({
       visionModelNone: '没有找到支持图片输入的模型（需在 DSH 的模型配置里声明 input: image）',
       visionModelLoading: '正在读取可用模型…',
       saved: '已保存',
+      saveSettings: '保存设置',
+      saving: '保存中…',
+      unsavedCount: '{n} 项未保存',
+      noChanges: '没有需要保存的改动',
+      resetDefault: '恢复默认',
+      resetConfirm: '确定恢复',
+      resetDone: '已恢复默认设置',
       saveFailed: '保存失败',
       loadFailed: '读取配置失败',
       loading: '正在读取配置…',
       modelFallback: '未能从 ComfyUI 取得模型列表，手动填写文件名。',
       modelIncompatible: '⚠ 不兼容',
-      modelFamilyHint: '本插件仅适用于 Qwen 家族模型。下拉里其他架构（SD / Flux 等）的文件即使选中也无法出图。',
+      modelNotPicked: '（未选择）',
+      modelFamilyHint: '这里只吃 Qwen-Image 家族的文件，其他架构会在下拉里标「⚠ 不兼容」。',
       recTitle: '推荐模型',
       recApply: '填入已安装的推荐项',
       recColKind: '类型',
@@ -133,8 +190,8 @@ window.__ModuleLoader__.load({
       seatTitleZombie: 'ComfyUI 进程卡死（端口被占用但服务无响应），点击强制终止并重启',
     }
     const en = {
-      title: 'Qwen Draw Lite',
-      lead: 'Local ComfyUI at the Qwen native working point. Changes save and take effect immediately, no restart needed.',
+      title: 'Easy Paint',
+      lead: 'Generates images through a local ComfyUI instance, with switchable model architectures.',
       connOnline: 'ComfyUI online',
       connOffline: 'ComfyUI offline',
       recheck: 'Recheck',
@@ -146,9 +203,28 @@ window.__ModuleLoader__.load({
       comfyMainPy: 'main.py path',
       comfyMainPyHint: 'ComfyUI entry file.',
       comfyWorkdir: 'Working directory',
+      modelsDir: 'Model folder',
+      modelsDirHint: 'Point at the models folder itself. Empty means <working dir>/models. When set, the model list is read straight from disk without ComfyUI running.',
       comfyWorkdirHint: 'Empty uses the main.py directory.',
       seatStarting: 'Starting…',
       models: 'Model files',
+      archLabel: 'Architecture',
+      archHint: 'Decides which ComfyUI workflow is used. Switching architecture means re-picking models; sampling defaults differ too.',
+      archQwen: 'Qwen-Image',
+      archSdxl: 'SDXL',
+      checkpoint: 'Checkpoint',
+      checkpointHint: 'Single-file model in models/checkpoints',
+      sdxlEditNote: 'SDXL image-to-image is plain repaint: it can only "paint another picture like this one", it does not understand instructions like "change the background to a beach". Use the Qwen-Image architecture for instruction-based editing.',
+      sdxlStepsHint: 'SDXL usually wants 25–30 steps. Too few looks mushy; beyond that returns diminish.',
+      sdxlCfgHint: 'SDXL usually 7–8. Below 5 the image goes flat and ignores the prompt.',
+      sdxlEditDenoiseHint: '0.6–0.75 keeps the original structure; 1.0 repaints the whole image.',
+      sdxlRecTitle: 'Common SDXL models',
+      sdxlRecBase: 'Official baseline, most reliable, good first choice',
+      sdxlRecReal: 'Photorealistic, strong on portraits and scene lighting',
+      sdxlRecAnime: 'Anime focused, prompt style same as regular SDXL',
+      sdxlRecHint: 'Drop the file into models/checkpoints, then hit Refresh above.',
+      copyModelHint: 'Click to copy the model name',
+      copyModelDone: 'Model name copied',
       unet: 'Diffusion model',
       unetHint: 'File name under models/diffusion_models.',
       clip: 'Text encoder',
@@ -177,8 +253,10 @@ window.__ModuleLoader__.load({
       scanNone: 'No ComfyUI found under this folder (needs main.py plus comfy/ or custom_nodes/).',
       hasPython: 'Python ok',
       noPython: 'no Python',
-      foldModels: 'Models',
-      foldModelsHint: 'Main model, text encoder, VAE',
+      foldQwen: 'Qwen',
+      foldQwenHint: 'Qwen-Image diffusion model, text encoder and VAE',
+      foldSdxl: 'SDXL',
+      foldSdxlHint: 'SDXL single-file checkpoint (models/checkpoints)',
       foldParams: 'Generation',
       foldParamsHint: 'Size, retries, negative prompt, post-check',
       foldAdvanced: 'Advanced',
@@ -194,7 +272,34 @@ window.__ModuleLoader__.load({
       cfg: 'Prompt guidance CFG',
       cfgHint: 'Prompt guidance. Use 1.0 with turbo models — at 2.5 repeated img2img drifts brighter (blown pixels 0.18%→17.6% over 3 rounds); 1.0 stays stable and is faster.',
       size: 'Default aspect',
-      negative: 'Default negative prompt',
+      positivePrompt: 'Default positive prompt',
+      positivePromptHint: 'Prepended to your description. Leave empty to use only your description.',
+      negativePrompt: 'Default negative prompt',
+      negativePromptHint: 'Sent as the negative prompt to suppress what you do not want.',
+      sdxlPositiveHint: 'SDXL-family models often use quality words like masterpiece, best quality. Leave empty to use only your description.',
+      sdxlNegativeHint: 'Sent as the negative prompt to suppress what you do not want.',
+      loraTitle: 'LoRA (optional, up to 5)',
+      loraHint: 'Chained into the workflow in order. Weights of 0.6–1.0 are typical; above 1 may overfit.',
+      loraAdd: 'Add LoRA',
+      loraPick: 'Pick a LoRA file',
+      loraEmpty: 'No LoRA added yet.',
+      loraRemove: 'Remove this entry',
+      loraSlotEmpty: '(empty)',
+      loraRowHint: 'Leave empty to skip',
+      loraRowNote: '(leave empty to skip)',
+      loraLoaded: 'Loaded',
+      loraIncompatible: 'Incompatible, LoRA not applied',
+      loraCross: 'Cross-base LoRA, may look worse',
+      loraCrossTitle: 'This LoRA was trained for {lora} but the Checkpoint is {cp}. It loads, but style and detail will degrade.',
+      loraNoMeta: 'This file has no base-model metadata; compatibility unknown',
+      loraNoCkpt: 'No checkpoint, compatibility unknown',
+      loraMissing: 'File missing',
+      loraMissingTitle: 'The file recorded in config no longer exists under models/loras (renamed or deleted). Pick another one or clear this slot.',
+      loraNoCkptTitle: 'Pick a Checkpoint above first, then compatibility can be judged',
+      loraMismatch: '⚠ different base than Checkpoint',
+      loraSd15Warn: '⚠ SD1.5 LoRA, unusable on SDXL',
+      loraMismatchTitle: 'This LoRA was trained for {lora}, but the current Checkpoint is {cp}. Mixing them weakens the effect.',
+      loraStrengthHint: 'Weight 0-2, 0.8 is typical',
       outputDir: 'Output directory',
       outputDirHint: 'Empty uses Desktop\\千问绘图.',
       machine: 'Machine',
@@ -220,12 +325,20 @@ window.__ModuleLoader__.load({
       visionModelNone: 'No image-capable model found (set input: image in the DSH model config)',
       visionModelLoading: 'Loading available models…',
       saved: 'Saved',
+      saveSettings: 'Save settings',
+      saving: 'Saving…',
+      unsavedCount: '{n} unsaved',
+      noChanges: 'Nothing to save',
+      resetDefault: 'Reset to defaults',
+      resetConfirm: 'Confirm reset',
+      resetDone: 'Defaults restored',
       saveFailed: 'Save failed',
       loadFailed: 'Failed to read configuration',
       loading: 'Loading configuration…',
       modelFallback: 'Could not read the model list from ComfyUI; type the file name.',
       modelIncompatible: '⚠ incompatible',
-      modelFamilyHint: 'This plugin only works with Qwen family models. Files from other architectures (SD / Flux etc.) will not render even if selected.',
+      modelNotPicked: '(not selected)',
+      modelFamilyHint: 'This section only accepts Qwen-Image family files; other architectures are tagged as incompatible in the dropdown.',
       recTitle: 'Recommended models',
       recApply: 'Fill installed ones',
       recColKind: 'Kind',
@@ -258,6 +371,117 @@ window.__ModuleLoader__.load({
    展开/收起折叠面板时内容高度变化 → 滚动条出现/消失 → 该列宽度抖动约 15px。
    这里只对「包含本插件设置页」的滚动容器预留滚动条槽位，消除跳动。 */
 [class*="options"]:has(.qwd-root) { scrollbar-gutter: stable; }
+/* 恢复默认：红框红字；长按时红色从左侧慢慢填满 */
+.qwd-reset-btn {
+  height: 30px; padding: 0 16px; border-radius: 7px;
+  border: 1px solid rgba(224, 90, 80, .65);
+  color: #e05a50;
+  font-size: 12px; cursor: pointer;
+  background: linear-gradient(
+    90deg,
+    rgba(224, 90, 80, .28) var(--qwd-reset-fill, 0%),
+    transparent var(--qwd-reset-fill, 0%)
+  );
+  transition: background .05s linear, color .15s;
+}
+.qwd-reset-btn:hover:not(:disabled) { background-color: rgba(224, 90, 80, .1); }
+.qwd-reset-btn:disabled { opacity: .45; cursor: default; }
+/* 已就绪：整块变实心红，提示「再点一次」 */
+.qwd-reset-armed {
+  background: rgba(224, 90, 80, .9) !important;
+  border-color: #e05a50;
+  color: #fff;
+  font-weight: 500;
+}
+
+/* LoRA 编辑区 */
+/* LoRA 行：标题+内联说明在左，下拉+权重在右，整行不折 */
+.qwd-lora-line { gap: 12px; flex-wrap: nowrap; }
+.qwd-lora-label {
+  display: flex; align-items: baseline; gap: 6px;
+  min-width: 0; white-space: nowrap;
+}
+.qwd-lora-name {
+  font-size: 13px; color: var(--dsw-alias-text-primary, #ededed);
+  transition: color .15s;
+}
+.qwd-lora-note {
+  font-size: 11px; color: var(--dsw-alias-text-secondary, #8b8f96);
+}
+/* 标题颜色完全由 tone 决定（见下方 .qwd-lora-tone-*），这里不再单独染色 */
+/* 状态文字：默认灰（留空不使用）/ 蓝（已装载）/ 红（不兼容） */
+/* 标题和状态文字共用同一套色调，保证一致 */
+.qwd-lora-tone-ok { color: var(--dsw-alias-accent-primary, #6ba4ff); }
+.qwd-lora-tone-idle { color: var(--dsw-alias-text-secondary, #8b8f96); }
+.qwd-lora-tone-warn { color: #e0a86c; }
+.qwd-lora-tone-bad { color: #e05a50; }
+.qwd-lora-note-ok { color: var(--dsw-alias-accent-primary, #6ba4ff); font-weight: 500; }
+.qwd-lora-note-warn { color: #e0a86c; font-weight: 500; }
+.qwd-lora-note-bad { color: #e05a50; font-weight: 500; }
+.qwd-lora-controls {
+  display: flex; align-items: center; gap: 8px;
+  flex: 0 0 auto;
+}
+.qwd-input.qwd-lora-select { width: 200px; font-size: 12px; }
+.qwd-input.qwd-lora-strength {
+  width: 54px; flex: none;
+  padding: 6px 2px 6px 6px;
+  font-size: 12px; text-align: center;
+}
+/* 数字输入框的上下箭头压窄一点，别把 54px 吃掉 */
+.qwd-lora-strength::-webkit-inner-spin-button,
+.qwd-lora-strength::-webkit-outer-spin-button { margin-left: 1px; }
+
+/* LoRA 和 Checkpoint 不同系时的警示 */
+.qwd-lora-warn {
+  margin-left: 6px;
+  font-size: 11px;
+  color: #e0a86c;
+  white-space: nowrap;
+}
+
+/* 有未保存改动的折叠面板：外边框变蓝 */
+.qwd-fold-dirty {
+  border-color: rgba(107, 164, 255, .55) !important;
+  box-shadow: 0 0 0 1px rgba(107, 164, 255, .18);
+}
+.qwd-fold-dirty > .qwd-fold-head .qwd-fold-title {
+  color: var(--dsw-alias-accent-primary, #6ba4ff);
+}
+
+/* 底部保存条 */
+/* 本机参数：顶部一行条 */
+.qwd-machine {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  margin: 0 0 14px;
+  font-size: 11px; line-height: 1.5;
+}
+.qwd-machine-k { color: var(--dsw-alias-text-secondary, #8b8f96); }
+.qwd-machine-v { color: var(--dsw-alias-text-primary, #ededed); }
+.qwd-machine-sep { color: rgba(128, 128, 128, .4); }
+
+.qwd-savebar {
+  display: flex; align-items: center; gap: 10px;
+  margin: 16px 0 10px;
+}
+.qwd-save-btn {
+  height: 30px; padding: 0 16px; border-radius: 7px;
+  border: 1px solid rgba(237, 237, 237, .55);
+  background: transparent;
+  color: var(--dsw-alias-text-primary, #ededed);
+  font-size: 12px; cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.qwd-save-btn:hover:not(:disabled) { background: rgba(237, 237, 237, .12); border-color: rgba(237, 237, 237, .8); }
+.qwd-save-btn:disabled { opacity: .55; cursor: default; }
+/* 有未保存改动时高亮，提示用户点它 */
+.qwd-save-dirty {
+  border-color: var(--dsw-alias-accent-primary, #6ba4ff);
+  color: var(--dsw-alias-accent-primary, #6ba4ff);
+  background: rgba(107, 164, 255, .1);
+}
+.qwd-save-hint { font-size: 11px; color: var(--dsw-alias-text-secondary, #8b8f96); }
+
 .qwd-lead { margin: 0 0 20px; font-size: 13px; line-height: 1.7; color: var(--dsw-alias-text-secondary, #8b8f96); }
 .qwd-conn {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -297,7 +521,8 @@ window.__ModuleLoader__.load({
 .qwd-dot-unknown { background: #9aa0a6; }
 .qwd-conn-text { font-size: 13px; color: var(--dsw-alias-text-primary, #ededed); }
 .qwd-conn-meta { font-size: 12px; color: var(--dsw-alias-text-secondary, #8b8f96); }
-.qwd-recheck {
+/* 未使用 */
+.qwd-recheck-unused {
   margin-left: auto; padding: 5px 12px; font: inherit; font-size: 12px; cursor: pointer;
   color: var(--dsw-alias-text-primary, #ededed);
   background: transparent; border: 1px solid rgba(128, 128, 128, .32); border-radius: 6px;
@@ -368,6 +593,12 @@ window.__ModuleLoader__.load({
 .qwd-field-text { min-width: 0; flex: 1 1 auto; }
 .qwd-label { font-size: 14px; line-height: 1.45; color: var(--dsw-alias-text-primary, #ededed); }
 .qwd-hint { margin-top: 3px; font-size: 12px; line-height: 1.5; color: var(--dsw-alias-text-secondary, #8b8f96); }
+/* 模型选择那一行的说明：空间不够就省略，不折成两行 */
+.qwd-hint-one-line {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .qwd-input {
   flex: 0 0 auto; width: 260px; box-sizing: border-box;
   padding: 6px 9px; font: inherit; font-size: 13px; line-height: 1.4;
@@ -419,6 +650,12 @@ window.__ModuleLoader__.load({
   font-size: 12px; color: var(--dsw-alias-text-secondary, #8b8f96); margin-bottom: 8px;
 }
 .qwd-recommend-list { display: flex; flex-direction: column; gap: 5px; }
+/* SDXL 那种纯文字列表（没有文件名和状态列） */
+.qwd-recommend-list-plain {
+  display: flex; flex-direction: column; gap: 4px;
+  font-size: 12px; line-height: 1.6;
+  color: var(--dsw-alias-text-primary, #ededed);
+}
 /* 推荐模型表格：真表格，列宽全局共享，竖线才对得齐 */
 .qwd-recommend-table {
   width: 100%;
@@ -456,12 +693,28 @@ window.__ModuleLoader__.load({
 .qwd-recommend-table tbody tr:last-child td { padding-bottom: 7px; }
 /* 类型列按最长的「文本编码器」定宽，状态列固定，中间吃满剩余 */
 .qwd-recommend-table th:nth-child(1),
-.qwd-recommend-table td:nth-child(1) { width: 84px; }
+.qwd-recommend-table td:nth-child(1) { width: 100px; }
 .qwd-recommend-table th:nth-child(3),
 .qwd-recommend-table td:nth-child(3) { width: 62px; }
+/* 类型/模型名列：允许换行，SDXL 那种长模型名（Pony Diffusion V6 XL）才不会撑破单元格 */
 .qwd-recommend-kind {
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
   color: var(--dsw-alias-text-primary, #ededed);
+}
+/* 可点击复制的模型名：指针 + hover 变色，复制后短暂变绿 */
+/* SDXL 表格：模型名比 Qwen 的类型名长，第一列单独加宽且强制单行 */
+.qwd-recommend-table-sdxl th:nth-child(1),
+.qwd-recommend-table-sdxl td:nth-child(1) { width: 136px; }
+.qwd-recommend-table-sdxl .qwd-recommend-kind { white-space: nowrap; }
+
+.qwd-copyable {
+  cursor: pointer;
+  transition: color .15s, background .15s;
+}
+.qwd-copyable:hover {
+  color: var(--dsw-alias-accent-primary, #6ba4ff);
+  background: rgba(107, 164, 255, .08);
 }
 .qwd-recommend-file {
   overflow: hidden;
@@ -543,10 +796,10 @@ window.__ModuleLoader__.load({
     }
 
     function Fold(props) {
-      const { title, sub, open, onToggle, children } = props
+      const { title, sub, open, onToggle, children, dirty } = props
       // 内容始终留在 DOM 里，用 grid-template-rows 0fr→1fr 做高度动画。
       // 收起时给 aria-hidden 和 inert，避免键盘焦点跑进看不见的字段。
-      return h('div', { className: `qwd-fold${open ? ' qwd-fold-open' : ''}` },
+      return h('div', { className: `qwd-fold${open ? ' qwd-fold-open' : ''}${dirty ? ' qwd-fold-dirty' : ''}` },
         h('div', {
           className: 'qwd-fold-head',
           role: 'button',
@@ -575,16 +828,17 @@ window.__ModuleLoader__.load({
     }
 
     function Field(props) {
-      const { label, hint, value, onChange, onBlur, disabled, narrow, type, invalid } = props
+      const { label, hint, value, onChange, onBlur, disabled, narrow, type, invalid, placeholder } = props
       return h('div', { className: 'qwd-field' },
         h('div', { className: 'qwd-field-text' },
           h('div', { className: 'qwd-label' }, label),
-          hint ? h('div', { className: 'qwd-hint' }, hint) : null,
+          hint ? h('div', { className: 'qwd-hint qwd-hint-one-line', title: hint }, hint) : null,
         ),
         h('input', {
           className: `qwd-input${narrow ? ' qwd-input-narrow' : ''}${invalid === true ? ' qwd-input-invalid' : ''}`,
           type: type ?? 'text',
           value: value ?? '',
+          placeholder: placeholder ?? '',
           disabled: disabled === true,
           onChange: (event) => onChange(event.target.value),
           onBlur: () => { if (typeof onBlur === 'function') onBlur() },
@@ -631,27 +885,33 @@ window.__ModuleLoader__.load({
     }
 
     function ModelField(props) {
-      const { label, hint, value, options, onChange, disabled, fallbackHint, t } = props
+      const { label, hint, value, options, onChange, disabled, fallbackHint, t, compatiblePattern } = props
       const list = Array.isArray(options) ? options : []
       if (list.length === 0) {
         return h(Field, { label, hint: `${hint} ${fallbackHint}`, value, onChange, disabled })
       }
       // 当前值是列表外的文件（比如刚被删掉）时也保留它，避免下拉显示成空白
       const merged = value && !list.includes(value) ? [value, ...list] : list
-      // 这套工作流只认 Qwen-Image 家族：别的架构（SD/Flux…）也会出现在下拉里，
-      // 但选中后跑不通，所以标出来，不偷偷过滤掉。
-      const isCompatible = (name) => /qwen/iu.test(name)
+      // 只有调用方传了 compatiblePattern 才做兼容性标记：Qwen 面板传 /qwen/，
+      // SDXL 面板不传——它的 checkpoint 文件本来就不含 qwen。
+      const isCompatible = compatiblePattern
+        ? (name) => compatiblePattern.test(name)
+        : () => true
       return h('div', { className: 'qwd-field' },
         h('div', { className: 'qwd-field-text' },
           h('div', { className: 'qwd-label' }, label),
-          hint ? h('div', { className: 'qwd-hint' }, hint) : null,
+          hint ? h('div', { className: 'qwd-hint qwd-hint-one-line', title: hint }, hint) : null,
         ),
         h('select', {
           className: 'qwd-input qwd-select-wide qwd-select',
           value: value ?? '',
           disabled: disabled === true,
           onChange: (event) => onChange(event.target.value),
-        }, merged.map((option) => h('option', { key: option, value: option },
+        }, 
+        // 没有选中值时必须显式给一个占位项：否则浏览器会默认显示第一个选项，
+        // 但 state 里仍是空字符串，造成「看起来选了、其实没选」。
+        merged.includes(value ?? '') ? null : h('option', { value: '' }, t('modelNotPicked')),
+        merged.map((option) => h('option', { key: option, value: option },
           isCompatible(option) ? option : `${option}　${t('modelIncompatible')}`))),
       )
     }
@@ -665,6 +925,18 @@ window.__ModuleLoader__.load({
       const [message, setMessage] = React.useState('')
       const [bad, setBad] = React.useState(false)
       const [checking, setChecking] = React.useState(false)
+    // 全局保存按钮的进行中标记
+    const [saving, setSaving] = React.useState(false)
+    // 后端下发的默认值，「恢复默认」用它整体覆盖
+    const [defaults, setDefaults] = React.useState({})
+    // 后端推导出的 models 目录，用作输入框占位提示
+    const [autoModelsDir, setAutoModelsDir] = React.useState('')
+    // 恢复默认的长按进度（0-100）与是否已就绪
+    const [resetFill, setResetFill] = React.useState(0)
+    const [resetArmed, setResetArmed] = React.useState(false)
+    const resetRaf = React.useRef(null)
+    // 刚填满的那一次松手不算「再点一次」，避免松手即恢复
+    const justArmedRef = React.useRef(false)
       const [hw, setHw] = React.useState({ hardware: null, refLimit: null })
       const [visionModels, setVisionModels] = React.useState([])
       const [loadingVision, setLoadingVision] = React.useState(false)
@@ -674,6 +946,22 @@ window.__ModuleLoader__.load({
       // 指定目录扫描：输入框常驻，不需要折叠状态
       const [customRoot, setCustomRoot] = React.useState('')
       const [customCandidates, setCustomCandidates] = React.useState(null)
+      // 刚复制过的模型名（「已复制」提示，1.5 秒后自动消失）
+      const [copiedName, setCopiedName] = React.useState('')
+      const copiedTimer = React.useRef(null)
+
+      /** 复制推荐模型名到剪贴板，并短暂显示「已复制」 */
+      const copyModelName = React.useCallback(async (name) => {
+        try {
+          await navigator.clipboard.writeText(name)
+          setCopiedName(name)
+          if (copiedTimer.current !== null) window.clearTimeout(copiedTimer.current)
+          copiedTimer.current = window.setTimeout(() => setCopiedName(''), 1500)
+        } catch {
+          setMessage(`复制失败：${name}`)
+        }
+        return null
+      }, [])
 
       /** 把某个候选写进配置 */
       const applyCandidate = React.useCallback(async (candidate) => {
@@ -726,7 +1014,7 @@ window.__ModuleLoader__.load({
         }
       }, [t, applyCandidate])
       // 折叠面板：默认全部收起，进来先看目录，按需展开
-      const [openFolds, setOpenFolds] = React.useState({ basic: false, models: false, params: false, advanced: false, appearance: false })
+      const [openFolds, setOpenFolds] = React.useState({ basic: false, qwen: false, sdxl: false, params: false, advanced: false, appearance: false })
       const toggleFold = React.useCallback((key) => {
         setOpenFolds((prev) => ({ ...prev, [key]: !prev[key] }))
       }, [])
@@ -745,7 +1033,7 @@ window.__ModuleLoader__.load({
       }, [])
 
       React.useEffect(() => { void loadVisionModels() }, [loadVisionModels])
-      const [models, setModels] = React.useState({ unet: [], clip: [], vae: [] })
+      const [models, setModels] = React.useState({ unet: [], clip: [], vae: [], checkpoints: [], loras: [], loraMeta: {} })
       const [modelsStale, setModelsStale] = React.useState(false)
       const [refreshingModels, setRefreshingModels] = React.useState(false)
       // Host 下发的推荐模型清单（新用户不知道该装什么时看这里）
@@ -758,10 +1046,17 @@ window.__ModuleLoader__.load({
           const data = await apiGet(API_MODELS)
           if (data?.recommended) setRecommended(data.recommended)
           if (data?.ok) {
-            setModels({ unet: data.unet ?? [], clip: data.clip ?? [], vae: data.vae ?? [] })
+            setModels({
+            unet: data.unet ?? [],
+            clip: data.clip ?? [],
+            vae: data.vae ?? [],
+            checkpoints: data.checkpoints ?? [],
+            loras: data.loras ?? [],
+            loraMeta: data.loraMeta ?? {},
+          })
             setModelsStale(data.stale === true)
           } else {
-            setModels({ unet: [], clip: [], vae: [] })
+            setModels({ unet: [], clip: [], vae: [], checkpoints: [], loras: [], loraMeta: {} })
             setModelsStale(false)
           }
         } catch (error) {
@@ -769,6 +1064,27 @@ window.__ModuleLoader__.load({
           setModelsStale(false)
         }
       }, [])
+
+      // LoRA 文件被改名 / 删掉后，配置里记的名字在可用列表里就找不到了。
+      // 统一在这里检查并清空，避免界面上留着一个永远选不中的死值。
+      // 依赖只放 models.loras，所以不会和自己写入的 draft 形成循环。
+      React.useEffect(() => {
+        if (!Array.isArray(models.loras) || models.loras.length === 0) return
+        const available = new Set(models.loras)
+        setDraft((prev) => {
+          const list = Array.isArray(prev.sdxlLoras) ? prev.sdxlLoras : []
+          if (list.length === 0) return prev
+          let changed = false
+          const next = list.map((l) => {
+            if (l && typeof l.name === 'string' && l.name !== '' && !available.has(l.name)) {
+              changed = true
+              return { ...l, name: '' }
+            }
+            return l
+          })
+          return changed ? { ...prev, sdxlLoras: next } : prev
+        })
+      }, [models.loras])
 
       /** 把已安装的推荐模型一键填进配置（没装的跳过，避免填个不存在的文件名） */
       const applyRecommended = React.useCallback(async () => {
@@ -802,6 +1118,10 @@ window.__ModuleLoader__.load({
             if (cancelled) return
             setConfig(data?.config ?? {})
             setDraft({ ...(data?.config ?? {}) })
+            // 后端的默认值：恢复默认按钮要用
+            setDefaults(data?.defaults ?? {})
+            // 自动推导的 models 目录：作为输入框占位提示
+            if (typeof data?.resolvedModelsDir === 'string') setAutoModelsDir(data.resolvedModelsDir)
             if (Array.isArray(data?.sizes) && data.sizes.length > 0) setSizes(data.sizes)
             setLoadError('')
           })
@@ -838,6 +1158,108 @@ window.__ModuleLoader__.load({
 
       const disabled = config === null
 
+      /** 某个折叠面板里有没有未保存改动 */
+      const panelDirty = React.useCallback((panel) => {
+        if (config === null) return false
+        const fields = PANEL_FIELDS[panel] ?? []
+        return fields.some((k) => {
+          const v = draft[k]
+          if (v === undefined) return false
+          return v !== config[k]
+        })
+      }, [config, draft])
+
+      /** 长按开始：1.2 秒内把红色填充推到 100%，到顶就 armed */
+      const startResetHold = React.useCallback(() => {
+        if (resetArmed || config === null) return
+        const start = Date.now()
+        const step = () => {
+          const pct = Math.min(100, ((Date.now() - start) / 1200) * 100)
+          setResetFill(pct)
+          if (pct >= 100) {
+            setResetArmed(true)
+            justArmedRef.current = true
+            return
+          }
+          resetRaf.current = window.requestAnimationFrame(step)
+        }
+        resetRaf.current = window.requestAnimationFrame(step)
+      }, [resetArmed, config])
+
+      /** 松开或移出：没到顶就清零重来 */
+      const cancelResetHold = React.useCallback(() => {
+        if (resetRaf.current !== null) {
+          window.cancelAnimationFrame(resetRaf.current)
+          resetRaf.current = null
+        }
+        if (!resetArmed) setResetFill(0)
+      }, [resetArmed])
+
+      // armed 后 2 秒无人确认就自动复位，避免一直停在红色状态
+      React.useEffect(() => {
+        if (!resetArmed) return undefined
+        const timer = window.setTimeout(() => {
+          setResetArmed(false)
+          setResetFill(0)
+          justArmedRef.current = false
+        }, 2000)
+        return () => window.clearTimeout(timer)
+      }, [resetArmed])
+
+      /** 已 armed 后再点一次：把所有设置写回默认值 */
+      const doReset = React.useCallback(async () => {
+        if (!resetArmed || config === null) return
+        setSaving(true)
+        try {
+          const data = await apiPost(API_CONFIG, { config: defaults })
+          setConfig(data?.config ?? { ...defaults })
+          setDraft({ ...(data?.config ?? {}) })
+          setBad(false)
+          setMessage(t('resetDone'))
+        } catch (error) {
+          setBad(true)
+          setMessage(`${t('saveFailed')}: ${error?.message ?? error}`)
+        } finally {
+          setSaving(false)
+          setResetArmed(false)
+          setResetFill(0)
+        }
+      }, [resetArmed, config, defaults, t])
+
+      /** 有改动但还没保存的字段（draft 与已存值不同的键） */
+      const dirtyFields = React.useMemo(() => {
+        if (config === null) return []
+        return Object.keys(draft).filter((k) => {
+          const v = draft[k]
+          if (v === undefined) return false
+          return v !== config[k]
+        })
+      }, [draft, config])
+
+      /** 一次性保存所有改动：底部那颗「保存设置」按钮调它 */
+      const saveAll = React.useCallback(async () => {
+        if (config === null) return
+        const patch = {}
+        for (const k of dirtyFields) patch[k] = draft[k]
+        if (Object.keys(patch).length === 0) {
+          setMessage(t('noChanges'))
+          return
+        }
+        setSaving(true)
+        try {
+          const data = await apiPost(API_CONFIG, { config: patch })
+          setConfig(data?.config ?? { ...config, ...patch })
+          setDraft({ ...(data?.config ?? {}) })
+          setBad(false)
+          setMessage(t('saved'))
+        } catch (error) {
+          setBad(true)
+          setMessage(`${t('saveFailed')}: ${error?.message ?? error}`)
+        } finally {
+          setSaving(false)
+        }
+      }, [config, draft, dirtyFields, t])
+
       // 采样步数的推荐区间跟着当前模型走：turbo 8–12，原生 20–30
       const turboSelected = String(draft.unet ?? '').toLowerCase().includes('turbo')
       const recommendLow = turboSelected ? 8 : 20
@@ -873,6 +1295,19 @@ window.__ModuleLoader__.load({
         h('style', null, STYLE),
         h('p', { className: 'qwd-lead' }, config === null ? t('loading') : t('lead')),
 
+        // 本机参数：一行紧凑显示，只读
+        h('div', { className: 'qwd-machine' },
+          h('span', { className: 'qwd-machine-k' }, t('gpu')),
+          h('span', { className: 'qwd-machine-v' }, hw.hardware?.gpuName || t('hwUnknown')),
+          h('span', { className: 'qwd-machine-sep' }, '·'),
+          h('span', { className: 'qwd-machine-k' }, t('vram')),
+          h('span', { className: 'qwd-machine-v' },
+            typeof hw.hardware?.vramTotalMb === 'number'
+              ? `${hw.hardware.vramTotalMb} MB` + (typeof hw.hardware?.vramFreeMb === 'number' ? `（空闲 ${hw.hardware.vramFreeMb} MB）` : '')
+              : t('hwUnknown')),
+        ),
+
+
         h('div', { className: 'qwd-conn' },
           // 左状态灯 + 中间说明 + 右侧操作按钮（离线=启动 / 在线=终止 / 生图中=禁用）
           h(ComfyControlBar, { t }),
@@ -880,7 +1315,7 @@ window.__ModuleLoader__.load({
 
         h(Fold, {
           title: t('foldBasic'), sub: t('foldBasicHint'),
-          open: openFolds.basic === true, onToggle: () => toggleFold('basic'),
+          open: openFolds.basic === true, onToggle: () => toggleFold('basic'), dirty: panelDirty('basic'),
         },
         // 安装位置：和「ComfyUI 地址」同一形态——左侧标题，右侧输入框 + 检测按钮。
         // 输入框留空就扫常见位置；填了目录就深扫那个目录。
@@ -928,37 +1363,114 @@ window.__ModuleLoader__.load({
           : null,
         h(Field, {
           label: t('endpoint'), value: draft.comfyUrl ?? '', disabled,
-          onChange: (v) => patch('comfyUrl', v), onBlur: () => { void save('comfyUrl'); void refreshStatus() },
+          onChange: (v) => patch('comfyUrl', v),
         }),
         h(Switch, {
           label: t('autoStart'), hint: t('autoStartHint'),
           checked: draft.autoStart !== false, disabled,
-          onChange: (v) => { patch('autoStart', v); void save('autoStart', null, v) },
+          onChange: (v) => { patch('autoStart', v)},
         }),
         h(Field, {
           label: t('comfyPython'), hint: t('comfyPythonHint'), value: draft.comfyPython ?? '', disabled,
-          onChange: (v) => patch('comfyPython', v), onBlur: () => { void save('comfyPython') },
+          onChange: (v) => patch('comfyPython', v),
         }),
         h(Field, {
           label: t('comfyMainPy'), hint: t('comfyMainPyHint'), value: draft.comfyMainPy ?? '', disabled,
-          onChange: (v) => patch('comfyMainPy', v), onBlur: () => { void save('comfyMainPy') },
+          onChange: (v) => patch('comfyMainPy', v),
         }),
         h(Field, {
           label: t('comfyWorkdir'), hint: t('comfyWorkdirHint'), value: draft.comfyWorkdir ?? '', disabled,
-          onChange: (v) => patch('comfyWorkdir', v), onBlur: () => { void save('comfyWorkdir') },
+          onChange: (v) => patch('comfyWorkdir', v),
+        }),
+        h(Field, {
+          label: t('modelsDir'), hint: t('modelsDirHint'), value: draft.modelsDir ?? '',
+          placeholder: autoModelsDir, disabled,
+          onChange: (v) => patch('modelsDir', v),
         }),
         h(Field, {
           label: t('outputDir'), hint: t('outputDirHint'), value: draft.outputDir ?? '', disabled,
-          onChange: (v) => patch('outputDir', v), onBlur: () => { void save('outputDir') },
+          onChange: (v) => patch('outputDir', v),
         }),
         ),
 
         h(Fold, {
-          title: t('foldModels'), sub: t('foldModelsHint'),
-          open: openFolds.models === true, onToggle: () => toggleFold('models'),
+          title: t('foldParams'), sub: t('foldParamsHint'),
+          open: openFolds.params === true, onToggle: () => toggleFold('params'), dirty: panelDirty('params'),
         },
+        h(SelectField, {
+          label: t('archLabel'),
+          hint: t('archHint'),
+          value: draft.arch ?? 'qwen-image',
+          options: [
+            { value: 'qwen-image', label: t('archQwen') },
+            { value: 'sdxl', label: t('archSdxl') },
+          ],
+          disabled,
+          onChange: (v) => { patch('arch', v)},
+        }),
+
+        h(SelectField, {
+          label: t('size'), value: draft.size ?? '1:1', options: sizes, disabled,
+          onChange: (v) => { patch('size', v)},
+        }),
+        h(Field, {
+          label: t('autoRetry'), hint: t('autoRetryHint'), type: 'number', narrow: true,
+          value: draft.autoRetry ?? 0, disabled,
+          onChange: (v) => patch('autoRetry', v),
+        }),
+        h(SelectField, {
+          label: t('selfCheckMode'), hint: t('selfCheckHint'),
+          value: draft.selfCheck ?? 'off',
+          options: [
+            { value: 'off', label: t('selfCheckOff') },
+            { value: 'light', label: t('selfCheckLight') },
+            { value: 'vision', label: t('selfCheckVision') },
+          ],
+          disabled,
+          onChange: (v) => { patch('selfCheck', v)},
+        }),
+        draft.selfCheck === 'vision'
+          ? (visionModels.length > 0
+            ? h(SelectField, {
+              label: t('visionModel'), hint: t('visionModelHint'),
+              value: `${draft.selfCheckProvider ?? ''}|${draft.selfCheckModel ?? ''}`,
+              options: visionModels.map((m) => ({
+                value: `${m.provider}|${m.model}`,
+                label: `${m.name || m.model}（${m.provider}）`,
+              })),
+              disabled,
+              onChange: (v) => {
+                const cut = v.indexOf('|')
+                const provider = v.slice(0, cut)
+                const model = v.slice(cut + 1)
+                patch('selfCheckProvider', provider)
+                patch('selfCheckModel', model)
+                void (async () => {
+                  await save('selfCheckProvider', null, provider)
+                  await save('selfCheckModel', null, model)
+                })()
+              },
+            })
+            : h('div', { className: 'qwd-field' },
+              h('div', { className: 'qwd-field-text' },
+                h('div', { className: 'qwd-hint' }, loadingVision ? t('visionModelLoading') : t('visionModelNone')),
+              ),
+            ))
+          : null,
+        // 视觉自检会调用真实模型：云端按次计费，本地免费。必须让用户看见。
+        draft.selfCheck === 'vision'
+          ? h('p', { className: 'qwd-cost-warn' }, t('visionCostWarning'))
+          : null,
+        ),
+
+        h(Fold, {
+          title: t('foldQwen'), sub: t('foldQwenHint'),
+          open: openFolds.qwen === true, onToggle: () => toggleFold('qwen'), dirty: panelDirty('qwen'),
+        },
+        modelsStale
+          ? h('p', { className: 'qwd-hint', style: { margin: '0 0 8px' } }, t('modelStale'))
+          : null,
         h('div', { className: 'qwd-group-head' },
-          h('div', { className: 'qwd-group-title' }, t('models')),
           h('button', {
             type: 'button', className: 'qwd-mini', disabled: disabled || refreshingModels,
             onClick: async () => {
@@ -967,40 +1479,8 @@ window.__ModuleLoader__.load({
             },
           }, refreshingModels ? t('reloading') : t('reload')),
         ),
-        modelsStale
-          ? h('p', { className: 'qwd-hint', style: { margin: '0 0 8px' } }, t('modelStale'))
-          : null,
+
         h('p', { className: 'qwd-hint', style: { margin: '0 0 10px' } }, t('modelFamilyHint')),
-        h(ModelField, {
-          label: t('unet'),
-          hint: t('unetHint'),
-          value: draft.unet ?? '',
-          options: models.unet,
-          disabled,
-          fallbackHint: t('modelFallback'),
-          t,
-          onChange: (v) => { patch('unet', v); void save('unet', null, v) },
-        }),
-        h(ModelField, {
-          label: t('clip'),
-          hint: t('clipHint'),
-          value: draft.clip ?? '',
-          options: models.clip,
-          disabled,
-          fallbackHint: t('modelFallback'),
-          t,
-          onChange: (v) => { patch('clip', v); void save('clip', null, v) },
-        }),
-        h(ModelField, {
-          label: t('vae'),
-          hint: t('vaeHint'),
-          value: draft.vae ?? '',
-          options: models.vae,
-          disabled,
-          fallbackHint: t('modelFallback'),
-          t,
-          onChange: (v) => { patch('vae', v); void save('vae', null, v) },
-        }),
         // 新用户不知道该装什么模型：列出实测可用的一套，标出本机装了哪些
         recommended
           ? h('div', { className: 'qwd-recommend' },
@@ -1040,142 +1520,333 @@ window.__ModuleLoader__.load({
             h('p', { className: 'qwd-hint', style: { margin: '8px 0 0' } }, t('recHint')),
           )
           : null,
-        ),
-
-        h(Fold, {
-          title: t('foldParams'), sub: t('foldParamsHint'),
-          open: openFolds.params === true, onToggle: () => toggleFold('params'),
-        },
-        h(SelectField, {
-          label: t('size'), value: draft.size ?? '1:1', options: sizes, disabled,
-          onChange: (v) => { patch('size', v); void save('size', null, v) },
+          h(ModelField, {
+            label: t('unet'),
+            hint: t('unetHint'),
+            value: draft.unet ?? '',
+            options: models.unet,
+            disabled,
+            fallbackHint: t('modelFallback'), compatiblePattern: /qwen/iu,
+            t,
+            onChange: (v) => { patch('unet', v)},
+          }),
+          h(ModelField, {
+            label: t('clip'),
+            hint: t('clipHint'),
+            value: draft.clip ?? '',
+            options: models.clip,
+            disabled,
+            fallbackHint: t('modelFallback'), compatiblePattern: /qwen/iu,
+            t,
+            onChange: (v) => { patch('clip', v)},
+          }),
+          h(ModelField, {
+            label: t('vae'),
+            hint: t('vaeHint'),
+            value: draft.vae ?? '',
+            options: models.vae,
+            disabled,
+            fallbackHint: t('modelFallback'), compatiblePattern: /qwen/iu,
+            t,
+            onChange: (v) => { patch('vae', v)},
+          }),
+        // Qwen 的默认提示词
+        h(Field, {
+          label: t('positivePrompt'), hint: t('positivePromptHint'), type: 'textarea',
+          value: draft.qwenPositive ?? '', disabled,
+          onChange: (v) => patch('qwenPositive', v),
         }),
         h(Field, {
-          label: t('autoRetry'), hint: t('autoRetryHint'), type: 'number', narrow: true,
-          value: draft.autoRetry ?? 0, disabled,
-          onChange: (v) => patch('autoRetry', v), onBlur: () => { void save('autoRetry', numberCast) },
+          label: t('negativePrompt'), hint: t('negativePromptHint'), type: 'textarea',
+          value: draft.qwenNegative ?? '', disabled,
+          onChange: (v) => patch('qwenNegative', v),
         }),
-        h(Field, {
-          label: t('negative'), value: draft.negative ?? '', disabled,
-          onChange: (v) => patch('negative', v), onBlur: () => { void save('negative') },
-        }),
-        h(SelectField, {
-          label: t('selfCheckMode'), hint: t('selfCheckHint'),
-          value: draft.selfCheck ?? 'off',
-          options: [
-            { value: 'off', label: t('selfCheckOff') },
-            { value: 'light', label: t('selfCheckLight') },
-            { value: 'vision', label: t('selfCheckVision') },
-          ],
-          disabled,
-          onChange: (v) => { patch('selfCheck', v); void save('selfCheck', null, v) },
-        }),
-        draft.selfCheck === 'vision'
-          ? (visionModels.length > 0
-            ? h(SelectField, {
-              label: t('visionModel'), hint: t('visionModelHint'),
-              value: `${draft.selfCheckProvider ?? ''}|${draft.selfCheckModel ?? ''}`,
-              options: visionModels.map((m) => ({
-                value: `${m.provider}|${m.model}`,
-                label: `${m.name || m.model}（${m.provider}）`,
-              })),
-              disabled,
-              onChange: (v) => {
-                const cut = v.indexOf('|')
-                const provider = v.slice(0, cut)
-                const model = v.slice(cut + 1)
-                patch('selfCheckProvider', provider)
-                patch('selfCheckModel', model)
-                void (async () => {
-                  await save('selfCheckProvider', null, provider)
-                  await save('selfCheckModel', null, model)
-                })()
-              },
-            })
-            : h('div', { className: 'qwd-field' },
-              h('div', { className: 'qwd-field-text' },
-                h('div', { className: 'qwd-hint' }, loadingVision ? t('visionModelLoading') : t('visionModelNone')),
-              ),
-            ))
-          : null,
-        // 视觉自检会调用真实模型：云端按次计费，本地免费。必须让用户看见。
-        draft.selfCheck === 'vision'
-          ? h('p', { className: 'qwd-cost-warn' }, t('visionCostWarning'))
-          : null,
-        ),
 
-        h(Fold, {
-          title: t('foldAdvanced'), sub: t('foldAdvancedHint'),
-          open: openFolds.advanced === true, onToggle: () => toggleFold('advanced'),
-        },
+        // Qwen-Image 自己的采样参数（和 SDXL 分开存，切换架构互不影响）
         h(Field, {
           label: t('steps'),
-          // 推荐步数跟着当前选的模型走：turbo 8–12，原生 20–30
           hint: stepsHintText,
           type: 'number', narrow: true,
-          value: draft.steps ?? '', disabled,
-          onChange: (v) => patch('steps', v), onBlur: () => { void save('steps', numberCast) },
+          value: draft.qwenSteps ?? 10, disabled,
+          onChange: (v) => patch('qwenSteps', v),
         }),
         h(Field, {
           label: t('cfg'), hint: t('cfgHint'), type: 'number', narrow: true,
-          value: draft.cfg ?? '', disabled,
-          onChange: (v) => patch('cfg', v), onBlur: () => { void save('cfg', numberCast) },
+          value: draft.qwenCfg ?? 1, disabled,
+          onChange: (v) => patch('qwenCfg', v),
         }),
         h(Field, {
           label: t('editDenoise'), hint: t('editDenoiseHint'), type: 'number', narrow: true,
-          value: draft.editDenoise ?? 1, disabled,
-          onChange: (v) => patch('editDenoise', v), onBlur: () => { void save('editDenoise', numberCast) },
+          value: draft.qwenEditDenoise ?? 1, disabled,
+          onChange: (v) => patch('qwenEditDenoise', v),
         }),
         h(Field, {
           label: t('maxRefImages'), hint: refLimitHintText, type: 'number', narrow: true,
           value: draft.maxRefImages ?? 2, invalid: refLimitTooHigh, disabled,
           onChange: (v) => patch('maxRefImages', v),
-          onBlur: () => { void save('maxRefImages', numberCast) },
         }),
+
         ),
 
         h(Fold, {
+          title: t('foldSdxl'), sub: t('foldSdxlHint'),
+          open: openFolds.sdxl === true, onToggle: () => toggleFold('sdxl'), dirty: panelDirty('sdxl'),
+        },
+        h('p', { className: 'qwd-cost-warn', style: { margin: '0 0 10px' } }, t('sdxlEditNote')),
+        h('div', { className: 'qwd-group-head' },
+          h('button', {
+            type: 'button', className: 'qwd-mini', disabled: disabled || refreshingModels,
+            onClick: async () => {
+              setRefreshingModels(true)
+              try { await refreshModels() } finally { setRefreshingModels(false) }
+            },
+          }, refreshingModels ? t('reloading') : t('reload')),
+        ),
+
+        // 常见 SDXL 模型表格：按文件名模糊匹配判断装没装
+        h('div', { className: 'qwd-recommend' },
+          h('div', { className: 'qwd-recommend-head' },
+            h('span', null, t('sdxlRecTitle')),
+          ),
+          h('table', { className: 'qwd-recommend-table qwd-recommend-table-sdxl' },
+            h('thead', null,
+              h('tr', null,
+                h('th', null, t('recColKind')),
+                h('th', null, t('recColFile')),
+                h('th', null, t('recColStatus')),
+              ),
+            ),
+            h('tbody', null,
+              SDXL_MODELS.map((m) => {
+                const installed = (models.checkpoints ?? []).some((f) => m.match.test(f))
+                return h('tr', { key: m.key, title: m.name },
+                  h('td', {
+                    className: 'qwd-recommend-kind qwd-copyable',
+                    title: t('copyModelHint'),
+                    role: 'button',
+                    onClick: () => { void copyModelName(m.name) },
+                  }, copiedName === m.name ? t('copyModelDone') : m.name),
+                  h('td', { className: 'qwd-recommend-file' }, t(m.descKey)),
+                  h('td', null, h('span', {
+                    className: `qwd-recommend-tag${installed ? ' qwd-tag-ok' : ' qwd-tag-miss'}`,
+                  }, installed ? t('recInstalled') : t('recMissing'))),
+                )
+              }),
+            ),
+          ),
+          h('p', { className: 'qwd-hint', style: { margin: '8px 0 0' } }, t('sdxlRecHint')),
+        ),
+
+        h(ModelField, {
+          label: t('checkpoint'),
+          hint: t('checkpointHint'),
+          value: draft.checkpoint ?? '',
+          options: models.checkpoints ?? [],
+          disabled,
+          fallbackHint: t('modelFallback'),
+          t,
+          onChange: (v) => { patch('checkpoint', v)},
+        }),
+        // LoRA 1–5：和 Checkpoint 并列的独立设置行，留空即不用
+        Array.from({ length: 5 }).map((_, index) => {
+          const list = Array.isArray(draft.sdxlLoras) ? draft.sdxlLoras : []
+          const lora = list[index] ?? { name: '', strength: 0.8 }
+          const inUse = (lora.name ?? '') !== ''
+          const update = (patchObj) => {
+            const next = Array.from({ length: 5 }).map((__, i) => {
+              const cur = list[i] ?? { name: '', strength: 0.8 }
+              return i === index ? { ...cur, ...patchObj } : cur
+            })
+            patch('sdxlLoras', next)
+          }
+          return h('div', {
+            key: index,
+            className: `qwd-field qwd-lora-line${inUse ? ' qwd-lora-active' : ''}`,
+          },
+          (() => {
+            // 先算状态，标题和文字共用同一个 tone：ok=蓝 / warn=黄 / bad=红
+            let tone = ''
+            let noteText = ''
+            let noteTitle = ''
+            if (inUse) {
+              // 文件被改名 / 删掉时，配置里记的名字在可用列表里就找不到了
+              const stillExists = (models.loras ?? []).includes(lora.name)
+              if (!stillExists) {
+                return h('div', { className: 'qwd-lora-label' },
+                  h('span', { className: 'qwd-lora-name qwd-lora-tone-bad' }, `LoRA ${index + 1}`),
+                  h('span', {
+                    className: 'qwd-lora-note qwd-lora-tone-bad',
+                    title: t('loraMissingTitle'),
+                  }, t('loraMissing')),
+                )
+              }
+              const meta = (models.loraMeta ?? {})[lora.name]
+              const loraFam = meta?.family ?? 'unknown'
+              const cpName = String(draft.checkpoint ?? '').toLowerCase()
+              const cpFam = cpName === '' ? ''
+                : cpName.includes('illustrious') ? 'illustrious'
+                  : cpName.includes('pony') ? 'pony'
+                    : cpName.includes('noob') ? 'noob'
+                      : 'sdxl'
+              if (loraFam === 'sd15') {
+                // SD1.5 的 LoRA 在任何一个 SDXL 底模上都跑不了，属于架构级不兼容，
+                // 所以即使还没选底模也能下结论。
+                tone = 'bad'
+                noteText = t('loraIncompatible')
+                noteTitle = t('loraSd15Warn')
+              } else if (cpFam === '') {
+                // 还没选 Checkpoint：无从比较，老老实实说没选，别谎报「已装载」
+                // 用 idle 色调，让标题和提示语都是次要灰，保持同色
+                tone = 'idle'
+                noteText = t('loraNoCkpt')
+                noteTitle = t('loraNoCkptTitle')
+              } else if (loraFam === 'unknown' || loraFam === cpFam) {
+                tone = 'ok'
+                noteText = t('loraLoaded')
+                noteTitle = loraFam === 'unknown' ? t('loraNoMeta') : ''
+              } else if (loraFam === 'sdxl' || loraFam === 'illustrious' || loraFam === 'pony' || loraFam === 'noob') {
+                // 跨系：能加载但效果打折
+                tone = 'warn'
+                noteText = t('loraCross')
+                noteTitle = t('loraCrossTitle').replace('{lora}', loraFam).replace('{cp}', cpFam)
+              } else {
+                tone = 'bad'
+                noteText = t('loraIncompatible')
+                noteTitle = t('loraMismatchTitle').replace('{lora}', loraFam).replace('{cp}', cpFam)
+              }
+            }
+            const toneClass = tone === '' ? '' : ` qwd-lora-tone-${tone}`
+            return h('div', { className: 'qwd-lora-label' },
+              h('span', { className: `qwd-lora-name${toneClass}` }, `LoRA ${index + 1}`),
+              noteText === ''
+                ? null
+                : h('span', { className: `qwd-lora-note${toneClass}`, title: noteTitle }, noteText),
+            )
+          })(),
+          h('div', { className: 'qwd-lora-controls' },
+            h('select', {
+              className: 'qwd-input qwd-select qwd-lora-select',
+              value: lora.name ?? '',
+              disabled,
+              onChange: (event) => update({ name: event.target.value }),
+            },
+            h('option', { value: '' }, t('loraSlotEmpty')),
+            // 已经被其他槽位占用的 LoRA 不再出现在这里，避免同一个文件重复装载
+            (models.loras ?? [])
+              .filter((file) => file === lora.name || !list.some((other, oi) => oi !== index && other.name === file))
+              .map((file) => h('option', { key: file, value: file }, file)),
+            ),
+            h('input', {
+              type: 'number', step: '0.05', min: '0', max: '2',
+              className: 'qwd-input qwd-lora-strength',
+              title: t('loraStrengthHint'),
+              value: lora.strength ?? 0.8,
+              disabled: disabled || !inUse,
+              onChange: (event) => update({ strength: Number(event.target.value) }),
+            }),
+          ),
+          )
+        }),
+
+
+
+        // SDXL 的默认提示词（Pony 这类模型要在这里写 score_9 等质量标签）
+        h(Field, {
+          label: t('positivePrompt'), hint: t('sdxlPositiveHint'), type: 'textarea',
+          value: draft.sdxlPositive ?? '', disabled,
+          onChange: (v) => patch('sdxlPositive', v),
+        }),
+        h(Field, {
+          label: t('negativePrompt'), hint: t('sdxlNegativeHint'), type: 'textarea',
+          value: draft.sdxlNegative ?? '', disabled,
+          onChange: (v) => patch('sdxlNegative', v),
+        }),
+
+        // SDXL 自己的采样参数
+        h(Field, {
+          label: t('steps'),
+          hint: t('sdxlStepsHint'),
+          type: 'number', narrow: true,
+          value: draft.sdxlSteps ?? 28, disabled,
+          onChange: (v) => patch('sdxlSteps', v),
+        }),
+        h(Field, {
+          label: t('cfg'), hint: t('sdxlCfgHint'), type: 'number', narrow: true,
+          value: draft.sdxlCfg ?? 7.5, disabled,
+          onChange: (v) => patch('sdxlCfg', v),
+        }),
+        h(Field, {
+          label: t('editDenoise'), hint: t('sdxlEditDenoiseHint'), type: 'number', narrow: true,
+          value: draft.sdxlEditDenoise ?? 0.6, disabled,
+          onChange: (v) => patch('sdxlEditDenoise', v),
+        }),
+
+        ),
+
+
+        h(Fold, {
           title: t('foldAppearance'), sub: t('foldAppearanceHint'),
-          open: openFolds.appearance === true, onToggle: () => toggleFold('appearance'),
+          open: openFolds.appearance === true, onToggle: () => toggleFold('appearance'), dirty: panelDirty('appearance'),
         },
         h(Switch, {
           label: t('showStatusSeat'), hint: t('showStatusSeatHint'),
           checked: draft.showStatusSeat !== false, disabled,
-          onChange: (v) => { patch('showStatusSeat', v); void save('showStatusSeat', null, v) },
+          onChange: (v) => { patch('showStatusSeat', v)},
         }),
         ),
 
-        // 机器信息：只读的检测结果，不折叠，固定放在最后
-        h('div', { className: 'qwd-group qwd-machine' },
-          h('div', { className: 'qwd-group-head' },
-            h('div', { className: 'qwd-group-title' }, t('machine')),
-            h('button', {
-              type: 'button', className: 'qwd-mini', disabled: checking,
-              onClick: () => { void refreshStatus() },
-            }, checking ? '…' : t('recheck')),
-          ),
-          h('div', { className: 'qwd-field' },
-            h('div', { className: 'qwd-field-text' },
-              h('div', { className: 'qwd-label' }, t('gpu')),
-              h('div', { className: 'qwd-hint' }, hw.hardware?.gpuName || t('hwUnknown')),
-            ),
-          ),
-          h('div', { className: 'qwd-field' },
-            h('div', { className: 'qwd-field-text' },
-              h('div', { className: 'qwd-label' }, t('vram')),
-              h('div', { className: 'qwd-hint' },
-                typeof hw.hardware?.vramTotalMb === 'number'
-                  ? `${hw.hardware.vramTotalMb} MB` + (typeof hw.hardware?.vramFreeMb === 'number' ? `（空闲 ${hw.hardware.vramFreeMb} MB）` : '')
-                  : t('hwUnknown')),
-            ),
-          ),
+
+        // 全局保存：所有字段先改 draft，点这里才真正写盘
+        h('div', { className: 'qwd-savebar' },
+          h('button', {
+            type: 'button',
+            className: dirtyFields.length > 0 ? 'qwd-save-btn qwd-save-dirty' : 'qwd-save-btn',
+            disabled: disabled || saving || dirtyFields.length === 0,
+            onClick: () => { void saveAll() },
+          }, saving ? t('saving') : t('saveSettings')),
+
+          h('button', {
+            type: 'button',
+            className: resetArmed ? 'qwd-reset-btn qwd-reset-armed' : 'qwd-reset-btn',
+            style: resetArmed ? undefined : { '--qwd-reset-fill': `${resetFill}%` },
+            disabled: disabled || saving,
+            onMouseDown: startResetHold,
+            onMouseUp: cancelResetHold,
+            onMouseLeave: cancelResetHold,
+            onTouchStart: startResetHold,
+            onTouchEnd: cancelResetHold,
+            onClick: () => {
+              // 长按填满的那次松手会带一次 click，跳过它；用户要再点一次才恢复
+              if (justArmedRef.current) { justArmedRef.current = false; return }
+              void doReset()
+            },
+          }, resetArmed ? t('resetConfirm') : t('resetDefault')),
+          dirtyFields.length > 0
+            ? h('span', { className: 'qwd-save-hint' }, t('unsavedCount').replace('{n}', String(dirtyFields.length)))
+            : null,
         ),
 
         h('div', { className: bad ? 'qwd-status qwd-status-bad' : 'qwd-status qwd-status-ok', role: 'status' }, message),
       )
     }
 
-    const SEAT_STYLE = `
+    /* 每个折叠面板负责的字段：用于判断「这一栏有没有未保存改动」 */
+const PANEL_FIELDS = {
+  basic: ['comfyUrl', 'autoStart', 'comfyPython', 'comfyMainPy', 'comfyWorkdir', 'modelsDir', 'outputDir'],
+  params: ['arch', 'size', 'autoRetry', 'selfCheck', 'selfCheckProvider', 'selfCheckModel'],
+  qwen: ['unet', 'clip', 'vae', 'qwenPositive', 'qwenNegative', 'qwenSteps', 'qwenCfg', 'qwenEditDenoise', 'maxRefImages'],
+  sdxl: ['checkpoint', 'sdxlPositive', 'sdxlNegative', 'sdxlSteps', 'sdxlCfg', 'sdxlEditDenoise', 'sdxlLoras'],
+  appearance: ['showStatusSeat'],
+}
+
+/* 常见 SDXL 模型清单：match 用文件名模糊匹配判断装没装 */
+const SDXL_MODELS = [
+  { key: 'illustrious', name: 'Illustrious XL', descKey: 'sdxlRecAnime', match: /illustrious/i },
+  { key: 'juggernaut', name: 'Juggernaut XL', descKey: 'sdxlRecReal', match: /juggernaut/i },
+  { key: 'sdxlBase', name: 'SDXL Base 1.0', descKey: 'sdxlRecBase', match: /sd_?xl[._-]?base|sd_xl_base/i },
+]
+
+const SEAT_STYLE = `
 .qwd-seat {
   display: inline-flex; align-items: center; gap: 6px;
   height: 26px; padding: 0 9px; border-radius: 13px;
@@ -1226,7 +1897,7 @@ window.__ModuleLoader__.load({
     function useComfyControl() {
       const [state, setState] = React.useState('unknown')
       const [meta, setMeta] = React.useState({
-        progress: null, busySince: null, lastError: '', version: '', endpoint: '',
+        progress: null, busySince: null, lastError: '', version: '', endpoint: '', archLabel: '',
       })
       const [zombie, setZombie] = React.useState(null)
       const [working, setWorking] = React.useState(false)
@@ -1249,6 +1920,8 @@ window.__ModuleLoader__.load({
             lastError: typeof data?.lastError === 'string' ? data.lastError : '',
             version: typeof data?.version === 'string' ? data.version : '',
             endpoint: typeof data?.endpoint === 'string' ? data.endpoint : '',
+            // 正在跑的架构短名（Qwen / SDXL），状态座显示「Qwen 出图中 4/10」
+            archLabel: typeof data?.archLabel === 'string' ? data.archLabel : '',
           })
           return next
         } catch {
@@ -1383,6 +2056,11 @@ window.__ModuleLoader__.load({
       }
 
       // 圆点在前、文字在后（「● 出图中 4/10」）
+      // 出图时把架构短名放在最前（「Qwen 出图中 4/10」）：状态座描述的是正在跑什么
+      if (state === 'busy' && typeof meta.archLabel === 'string' && meta.archLabel !== '') {
+        label = `${meta.archLabel} ${label}`
+      }
+
       const body = [h('span', { key: 'dot', className: 'qwd-seat-dot', 'aria-hidden': true }), h('span', { key: 'label' }, label)]
 
       // 填充模式：把进度百分比交给 CSS 变量，由 ::before 铺底色
@@ -1560,6 +2238,11 @@ window.__ModuleLoader__.load({
         label = t('seatZombie')
       } else {
         label = t('connOffline')
+      }
+
+      // 控制条也带上架构短名，和状态座保持一致
+      if (state === 'busy' && typeof meta.archLabel === 'string' && meta.archLabel !== '') {
+        label = `${meta.archLabel} ${label}`
       }
 
       const dotKind = state === 'on' ? 'on'
