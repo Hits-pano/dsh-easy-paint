@@ -6,7 +6,7 @@
 
 支持 **Qwen-Image**、**SDXL**、**Z-Image** 三套架构，可在设置页切换。SDXL 侧额外支持 LoRA（最多 5 个串联）。
 
-唯一的例外：开启「视觉自检」并选用云端 API 模型时，每次出图会多一次模型调用（本地视觉模型则不花钱）。
+唯一的例外：开启「**视觉自检**」并选用云端 API 模型时，每次出图会多一次模型调用（本地视觉模型则不花钱）。轻量自检只读文件尺寸，**不调模型、不产生费用**。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![DSH Plugin](https://img.shields.io/badge/DeepSeek%20Harness-plugin-blue.svg)]()
@@ -73,7 +73,7 @@ dsh plugin add Hits-pano/dsh-easy-paint
 | **底模兼容检测** | 自动读 LoRA 元数据，判断和 Checkpoint 是否同系 |
 | **实时进度** | 状态胶囊显示「Qwen 出图中 4/10」「SDXL 出图中 12/28」「Z-Image 出图中 3/8」 |
 | **自动启停 ComfyUI** | 出图前探活，没启动就自动拉起 |
-| **出图自检** | 可选：检查尺寸文件 / 调用视觉模型看画面 |
+| **出图自检** | 可选：「轻量」只查文件尺寸（不调模型、零费用）/「视觉」才调模型看图 |
 | **自动重试** | 可选：一次出多张不同种子供挑选 |
 | **原生设置页** | 6 个折叠面板，改完点保存生效 |
 | **路径自动检测** | 首次安装扫一遍磁盘，自动填好 Python 和 main.py 路径 |
@@ -365,7 +365,7 @@ Z-Image 架构 —— 独立体系，目前没有 LoRA 生态
 | **模型架构** | Qwen-Image / SDXL / Z-Image，决定用哪套工作流 |
 | 默认画幅 | 7 种比例 |
 | 自动重试 | 0 = 一张，N = 连出 1+N 张不同种子 |
-| 自检强度 | off / light（查尺寸文件）/ vision（模型看图） |
+| 自检强度 | off（零开销）/ light（只读文件，**不调模型**）/ vision（调模型看图，可能计费） |
 
 ### Qwen 设置
 
