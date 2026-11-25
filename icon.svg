@@ -1,4 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36" role="img" aria-label="Qwen Draw">
+<!-- easy-paint 插件图标：矢量版，位图版见 assets/icon-180.png。 -->
+<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36" role="img" aria-label="Easy Paint">
   <!-- 笔杆 -->
   <rect x="12.4" y="6.5" width="3.4" height="17" rx="1.7" fill="#5b7db1"/>
   <!-- 金属箍 -->
