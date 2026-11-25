@@ -51,11 +51,12 @@ window.__ModuleLoader__.load({
       stepsHintNative: '原生模型推荐 20–30 步，25 是常用工作点。',
       stepsOutOfRange: '当前值超出推荐范围',
       paramCfgTooLowForNative: 'CFG 是 {v}。这个模型不是 turbo 蒸馏版，CFG 低于 {low} 时提示词几乎没有引导力——图生图会表现得像「不响应描述」。建议 {low}–{high}。',
+      paramCfgTooHighForNative: 'CFG 是 {v}。这个模型不是 turbo 蒸馏版，CFG 高于 {high} 时引导过强，画面容易过曝、发闷、笔触僵硬。建议 {low}–{high}。',
       paramCfgTooHighForTurbo: 'CFG 是 {v}。turbo 蒸馏版按 CFG 1 训练，调高画面容易过曝。建议改回 1。',
       paramStepsOutOfRange: '采样步数是 {v}，当前模型推荐 {low}–{high} 步。',
       // SDXL
-      sdxlCfgLow: 'CFG 是 {v}。SDXL 低于 5 时画面会发灰、明显不跟提示词。建议 7–8。',
-      sdxlCfgHigh: 'CFG 是 {v}。SDXL 高于 12 容易过曝发糊。建议 7–8。',
+      sdxlCfgLow: 'CFG 是 {v}。SDXL 低于 7 时提示词引导偏弱，画面容易发灰。建议 7–8。',
+      sdxlCfgHigh: 'CFG 是 {v}。SDXL 高于 8 容易出现高光溢出、画面发糊、笔触僵硬。建议 7–8。',
       sdxlStepsOutOfRange: '采样步数是 {v}，SDXL 推荐 {low}–{high} 步。太少会糊，再多收益递减。',
       // Z-Image
       zimageCfgHigh: 'CFG 是 {v}。Z-Image-Turbo 按 CFG 1 训练，调高容易过曝。建议改回 1。',
@@ -85,7 +86,7 @@ window.__ModuleLoader__.load({
       zimageNote: '三件套和 Qwen 不通用，别混用。',
       zimageRecHint: '放进对应目录后点上面的「刷新模型列表」即可识别。主模型有三个量化版本：int8（5.8 GB，已验证）、bf16（11.5 GB，画质最好但显存吃紧）、nvfp4（4.2 GB，需 RTX 50 系）——放进 diffusion_models 就会自动出现在下拉里。',
       zimagePositiveHint: '留空即可。Z-Image 不需要质量标签，用自然语言描述，它会推理；中英文文字渲染是强项。',
-      zimageStepsHint: 'Z-Image-Turbo 推荐 8 步（蒸馏模型，再多也没提升）。',
+      zimageStepsHint: 'Z-Image-Turbo 推荐 6–12 步，8 步是官方甜点。',
       zimageCfgHint: 'Z-Image-Turbo 固定 1.0。调高会让负面词生效，但容易过曝。',
       zimageEditDenoiseHint: '0.6–0.75 保留原图结构；1.0 等于整图重画。官方 Z-Image-Edit 还没发布，这里是标准重绘。',
       archZimage: 'Z-Image',
@@ -228,11 +229,12 @@ window.__ModuleLoader__.load({
       stepsHintNative: 'Native models: 20–30 steps, with 25 as the usual working point.',
       stepsOutOfRange: 'current value is outside the recommended range',
       paramCfgTooLowForNative: 'CFG is {v}. This model is not a distilled turbo variant; below CFG {low} the prompt has almost no guidance and image-to-image behaves as if it ignores your description. Suggested range: {low}-{high}.',
+      paramCfgTooHighForNative: 'CFG is {v}. This model is not a distilled turbo variant; above CFG {high} the guidance becomes too strong and the image tends to blow out, look muddy or stiff. Suggested range: {low}-{high}.',
       paramCfgTooHighForTurbo: 'CFG is {v}. Distilled turbo models are trained at CFG 1; higher values tend to blow out the image. Suggested value: 1.',
       paramStepsOutOfRange: 'Steps is {v}; this model works best at {low}-{high}.',
       // SDXL
-      sdxlCfgLow: 'CFG is {v}. Below 5 SDXL produces washed-out images that ignore the prompt. Suggested range: 7-8.',
-      sdxlCfgHigh: 'CFG is {v}. Above 12 SDXL tends to blow out and blur. Suggested range: 7-8.',
+      sdxlCfgLow: 'CFG is {v}. Below 7 SDXL guidance is weak and the image tends to look flat. Suggested range: 7-8.',
+      sdxlCfgHigh: 'CFG is {v}. Above 8 SDXL tends to clip highlights, blur and stiffen. Suggested range: 7-8.',
       sdxlStepsOutOfRange: 'Steps is {v}; SDXL works best at {low}-{high}.',
       // Z-Image
       zimageCfgHigh: 'CFG is {v}. Z-Image-Turbo is trained at CFG 1; higher values tend to blow out. Suggested: 1.',
@@ -262,7 +264,7 @@ window.__ModuleLoader__.load({
       zimageNote: 'These files are not interchangeable with Qwen.',
       zimageRecHint: 'Put the files in the folders above, then hit "Reload models". The main model comes in three quantizations: int8 (5.8 GB, verified), bf16 (11.5 GB, best quality but heavy), nvfp4 (4.2 GB, needs RTX 50 series) — drop one into diffusion_models and it shows up in the dropdown automatically.',
       zimagePositiveHint: 'Leave empty. Z-Image needs no quality tags; describe naturally and it reasons. Strong at rendering Chinese and English text.',
-      zimageStepsHint: 'Z-Image-Turbo recommends 8 steps (distilled model, more gains little).',
+      zimageStepsHint: 'Z-Image-Turbo works best at 6-12 steps; 8 is the official sweet spot.',
       zimageCfgHint: 'Fixed at 1.0 for Z-Image-Turbo. Raising it makes negatives apply but tends to blow out highlights.',
       zimageEditDenoiseHint: '0.6-0.75 keeps the original structure; 1.0 repaints the whole image. Official Z-Image-Edit is not released yet, this is plain repaint.',
       archZimage: 'Z-Image',
@@ -560,12 +562,16 @@ window.__ModuleLoader__.load({
   padding: 10px 0; border-bottom: 1px solid rgba(128, 128, 128, .12);
 }
 .qwd-field:last-child { border-bottom: none; }
-/* 输入框下面要多挂一行说明时用：把横向的 .qwd-field 包起来，
-   让说明文字独占一行，而不是被 flex 挤到输入框右边。 */
-.qwd-field-column { display: flex; flex-direction: column; }
-.qwd-field-column > .qwd-field { padding-bottom: 4px; }
+/* 输入行 + 提示行组成一个字段组：分隔线画在 .qwd-field-column 上，
+   内部 .qwd-field 不再画线，避免提示行出现在两条线之间。 */
+.qwd-field-column {
+  display: flex; flex-direction: column;
+  border-bottom: 1px solid rgba(128, 128, 128, .12);
+}
+.qwd-field-column:last-child { border-bottom: none; }
+.qwd-field-column > .qwd-field { border-bottom: none; }
 .qwd-field-column > .qwd-field-note {
-  margin: 0 0 8px; padding-right: 8px;
+  margin: -8px 0 6px; padding-right: 8px;
   font-size: 12px; line-height: 1.55;
 }
 .qwd-field-note-bad { color: #cf6a5f; }
@@ -873,28 +879,34 @@ window.__ModuleLoader__.load({
 
     function Field(props) {
       const { label, hint, value, onChange, onBlur, disabled, narrow, type, invalid, warn, warnText, placeholder } = props
-      const row = h('div', { className: 'qwd-field' },
-        h('div', { className: 'qwd-field-text' },
-          h('div', { className: 'qwd-label' }, label),
-          hint ? h('div', { className: 'qwd-hint qwd-hint-one-line', title: hint }, hint) : null,
+      /**
+       * 结构必须恒定：外层永远是 .qwd-field-column，里面永远是「输入行 + 提示行」。
+       *
+       * 之前是「有提示就多包一层、没提示就不包」，结果 warnText 一出现/消失，
+       * input 的父节点就变了，React 会卸载重建 DOM，光标直接丢失，没法连续输入。
+       * 现在提示行用 display:none 占位，节点结构不动。
+       */
+      return h('div', { className: 'qwd-field-column' },
+        h('div', { className: 'qwd-field' },
+          h('div', { className: 'qwd-field-text' },
+            h('div', { className: 'qwd-label' }, label),
+            hint ? h('div', { className: 'qwd-hint qwd-hint-one-line', title: hint }, hint) : null,
+          ),
+          h('input', {
+            className: `qwd-input${narrow ? ' qwd-input-narrow' : ''}${invalid === true ? ' qwd-input-invalid' : ''}${warn === true ? ' qwd-input-warn' : ''}`,
+            type: type ?? 'text',
+            value: value ?? '',
+            placeholder: placeholder ?? '',
+            disabled: disabled === true,
+            onChange: (event) => onChange(event.target.value),
+            onBlur: () => { if (typeof onBlur === 'function') onBlur() },
+          }),
         ),
-        h('input', {
-          className: `qwd-input${narrow ? ' qwd-input-narrow' : ''}${invalid === true ? ' qwd-input-invalid' : ''}${warn === true ? ' qwd-input-warn' : ''}`,
-          type: type ?? 'text',
-          value: value ?? '',
-          placeholder: placeholder ?? '',
-          disabled: disabled === true,
-          onChange: (event) => onChange(event.target.value),
-          onBlur: () => { if (typeof onBlur === 'function') onBlur() },
-        }),
-      )
-      // 传了 warnText 就在输入框下面单独挂一行说明（不塞进横向的 .qwd-field 里，
-      // 否则会被 justify-content: space-between 挤到输入框右边）
-      if (!warnText) return row
-      return h('div', { className: 'qwd-field-column' }, row,
         h('div', {
           className: `qwd-field-note ${warn === true ? 'qwd-field-note-warn' : 'qwd-field-note-bad'}`,
-        }, warnText))
+          style: warnText ? undefined : { display: 'none' },
+        }, warnText ?? ''),
+      )
     }
 
     function SelectField(props) {
@@ -962,31 +974,35 @@ window.__ModuleLoader__.load({
         ? (name) => compatiblePattern.test(name)
         : () => true
       const currentBad = typeof value === 'string' && value !== '' && !isCompatible(value)
-      const row = h('div', { className: 'qwd-field' },
-        h('div', { className: 'qwd-field-text' },
-          h('div', { className: 'qwd-label' }, label),
-          hint ? h('div', { className: 'qwd-hint qwd-hint-one-line', title: hint }, hint) : null,
+      // 结构恒定：外层永远是 .qwd-field-column，提示行用 display:none 占位，
+      // 避免 currentBad 翻转时 select 因父节点变化被卸载重建。
+      return h('div', { className: 'qwd-field-column' },
+        h('div', { className: 'qwd-field' },
+          h('div', { className: 'qwd-field-text' },
+            h('div', { className: 'qwd-label' }, label),
+            hint ? h('div', { className: 'qwd-hint qwd-hint-one-line', title: hint }, hint) : null,
+          ),
+          h('select', {
+            className: 'qwd-input qwd-select-wide qwd-select'
+              + (currentBad ? ' qwd-input-invalid' : ''),
+            value: value ?? '',
+            disabled: disabled === true,
+            onChange: (event) => onChange(event.target.value),
+          },
+          // 没有选中值时必须显式给一个占位项：否则浏览器会默认显示第一个选项，
+          // 但 state 里仍是空字符串，造成「看起来选了、其实没选」。
+          merged.includes(value ?? '') ? null : h('option', { value: '' }, t('modelNotPicked')),
+          merged.map((option) => {
+            const ok = isCompatible(option)
+            return h('option', { key: option, value: option },
+              ok ? option : `${option}　⚠ ${t('modelIncompatible')}`)
+          })),
         ),
-        h('select', {
-          className: 'qwd-input qwd-select-wide qwd-select'
-            + (currentBad ? ' qwd-input-invalid' : ''),
-          value: value ?? '',
-          disabled: disabled === true,
-          onChange: (event) => onChange(event.target.value),
-        },
-        // 没有选中值时必须显式给一个占位项：否则浏览器会默认显示第一个选项，
-        // 但 state 里仍是空字符串，造成「看起来选了、其实没选」。
-        merged.includes(value ?? '') ? null : h('option', { value: '' }, t('modelNotPicked')),
-        merged.map((option) => {
-          const ok = isCompatible(option)
-          return h('option', { key: option, value: option },
-            ok ? option : `${option}　⚠ ${t('modelIncompatible')}`)
-        })),
+        h('div', {
+          className: 'qwd-field-note qwd-field-note-bad',
+          style: currentBad ? undefined : { display: 'none' },
+        }, t('modelIncompatibleWarn')),
       )
-      // 选到不兼容的模型：说明文字挂在下拉框正下方，独占一行
-      if (!currentBad) return row
-      return h('div', { className: 'qwd-field-column' }, row,
-        h('div', { className: 'qwd-field-note qwd-field-note-bad' }, t('modelIncompatibleWarn')))
     }
 
     function EasyPaintSettings(props) {
@@ -1376,7 +1392,8 @@ window.__ModuleLoader__.load({
         if (String(draft.unet ?? '').trim() === '') return false
         const v = Number(draft.qwenCfg)
         if (!Number.isFinite(v)) return false
-        return turboSelected ? v > 1.5 : v < 2.5
+        // turbo 版文案说「建议改回 1」，非 turbo 说「建议 2.5–4」，都按文案来
+        return turboSelected ? v > 1 : (v < 2.5 || v > 4)
       })()
       const qwenStepsWarn = stepsOutOfRange
       // 折叠标题要不要标黄：两格里任一出问题就标
@@ -1385,9 +1402,12 @@ window.__ModuleLoader__.load({
       // SDXL 的参数区间和 Qwen 完全不同，单独算
       const sdxlStepsValue = Number(draft.sdxlSteps)
       const sdxlCfgValue = Number(draft.sdxlCfg)
+      // 文案说「通常 25–30 步」，预警就按这个区间
       const sdxlStepsWarn = Number.isFinite(sdxlStepsValue) && sdxlStepsValue > 0
-        && (sdxlStepsValue < 20 || sdxlStepsValue > 40)
-      const sdxlCfgWarn = Number.isFinite(sdxlCfgValue) && (sdxlCfgValue < 5 || sdxlCfgValue > 12)
+        && (sdxlStepsValue < 25 || sdxlStepsValue > 30)
+      // 预警范围 = 文案里的推荐范围（7–8），两边必须一致，否则用户看到「建议 7–8」
+      // 却把 6 当合法值填进去，就自相矛盾了。
+      const sdxlCfgWarn = Number.isFinite(sdxlCfgValue) && (sdxlCfgValue < 7 || sdxlCfgValue > 8)
       const sdxlPanelWarn = sdxlStepsWarn || sdxlCfgWarn
 
       // Z-Image-Turbo 按 CFG 1 训练，步数 8 是官方甜点
@@ -1395,7 +1415,8 @@ window.__ModuleLoader__.load({
       const zCfgValue = Number(draft.zImageCfg)
       const zStepsWarn = Number.isFinite(zStepsValue) && zStepsValue > 0
         && (zStepsValue < 6 || zStepsValue > 12)
-      const zCfgWarn = Number.isFinite(zCfgValue) && zCfgValue > 1.5
+      // 文案说「固定 1.0」，超过 1 就算偏离
+      const zCfgWarn = Number.isFinite(zCfgValue) && zCfgValue > 1
       const zPanelWarn = zStepsWarn || zCfgWarn
 
       // 参考图上限：拿硬件推荐值和用户填的值比，超了就把输入框标红
@@ -1714,10 +1735,15 @@ window.__ModuleLoader__.load({
           warnText: qwenCfgWarn
             ? (turboSelected
                 ? t('paramCfgTooHighForTurbo').replace(/\{v\}/gu, String(Number(draft.qwenCfg)))
-                : t('paramCfgTooLowForNative')
-                  .replace(/\{v\}/gu, String(Number(draft.qwenCfg)))
-                  .replace(/\{low\}/gu, '2.5')
-                  .replace(/\{high\}/gu, '4'))
+                : Number(draft.qwenCfg) > 4
+                  ? t('paramCfgTooHighForNative')
+                    .replace(/\{v\}/gu, String(Number(draft.qwenCfg)))
+                    .replace(/\{low\}/gu, '2.5')
+                    .replace(/\{high\}/gu, '4')
+                  : t('paramCfgTooLowForNative')
+                    .replace(/\{v\}/gu, String(Number(draft.qwenCfg)))
+                    .replace(/\{low\}/gu, '2.5')
+                    .replace(/\{high\}/gu, '4'))
             : undefined,
           onChange: (v) => patch('qwenCfg', v),
         }),
@@ -1883,8 +1909,8 @@ window.__ModuleLoader__.load({
           warnText: sdxlStepsWarn
             ? t('sdxlStepsOutOfRange')
               .replace(/\{v\}/gu, String(sdxlStepsValue))
-              .replace(/\{low\}/gu, '20')
-              .replace(/\{high\}/gu, '40')
+              .replace(/\{low\}/gu, '25')
+              .replace(/\{high\}/gu, '30')
             : undefined,
           onChange: (v) => patch('sdxlSteps', v),
         }),
@@ -1893,7 +1919,7 @@ window.__ModuleLoader__.load({
           value: draft.sdxlCfg ?? 7.5, disabled,
           warn: sdxlCfgWarn,
           warnText: sdxlCfgWarn
-            ? (sdxlCfgValue < 5
+            ? (sdxlCfgValue < 7
                 ? t('sdxlCfgLow').replace(/\{v\}/gu, String(sdxlCfgValue))
                 : t('sdxlCfgHigh').replace(/\{v\}/gu, String(sdxlCfgValue)))
             : undefined,

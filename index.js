@@ -927,7 +927,8 @@ function computeParamIssues(cfg) {
 
     if (Number.isFinite(cfgScale)) {
       if (!turbo && cfgScale < 2.5) issues.push('cfgLowNative')
-      if (turbo && cfgScale > 1.5) issues.push('cfgHighTurbo')
+      if (!turbo && cfgScale > 4) issues.push('cfgHighNative')
+      if (turbo && cfgScale > 1) issues.push('cfgHighTurbo')
     }
     if (Number.isFinite(steps) && steps > 0) {
       const low = turbo ? 8 : 20
@@ -940,12 +941,12 @@ function computeParamIssues(cfg) {
   if (arch.id === 'sdxl') {
     const steps = Number(cfg.sdxlSteps)
     const cfgScale = Number(cfg.sdxlCfg)
-    // SDXL 的 CFG 低于 5 时画面发灰、明显不跟提示词；高于 12 容易过曝和糊
+    // 预警范围与文案里的推荐范围一致：CFG 7–8、步数 25–30
     if (Number.isFinite(cfgScale)) {
-      if (cfgScale < 5) issues.push('sdxlCfgLow')
-      if (cfgScale > 12) issues.push('sdxlCfgHigh')
+      if (cfgScale < 7) issues.push('sdxlCfgLow')
+      if (cfgScale > 8) issues.push('sdxlCfgHigh')
     }
-    if (Number.isFinite(steps) && steps > 0 && (steps < 20 || steps > 40)) {
+    if (Number.isFinite(steps) && steps > 0 && (steps < 25 || steps > 30)) {
       issues.push('sdxlStepsOutOfRange')
     }
     return issues
@@ -955,7 +956,7 @@ function computeParamIssues(cfg) {
     const steps = Number(cfg.zImageSteps)
     const cfgScale = Number(cfg.zImageCfg)
     // Z-Image-Turbo 按 CFG 1 训练，调高会过曝；步数 8 步是官方甜点
-    if (Number.isFinite(cfgScale) && cfgScale > 1.5) issues.push('zimageCfgHigh')
+    if (Number.isFinite(cfgScale) && cfgScale > 1) issues.push('zimageCfgHigh')
     if (Number.isFinite(steps) && steps > 0 && (steps < 6 || steps > 12)) {
       issues.push('zimageStepsOutOfRange')
     }
