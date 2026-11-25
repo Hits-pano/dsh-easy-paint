@@ -3,7 +3,7 @@ window.__ModuleLoader__.load({
   factory(require) {
     const React = require('react')
     const h = React.createElement
-    const NS = 'settings.qwenDraw'
+    const NS = 'settings.easyPaint'
 
     const API_CONFIG = 'api/easy-paint/config'
     const API_STATUS = 'api/easy-paint/status'
@@ -897,7 +897,7 @@ window.__ModuleLoader__.load({
       )
     }
 
-    function QwenDrawSettings(props) {
+    function EasyPaintSettings(props) {
       const t = props.t
       const [config, setConfig] = React.useState(null)
       const [draft, setDraft] = React.useState({})
@@ -2312,18 +2312,18 @@ const SEAT_STYLE = `
       inject: ['slots', 'locale'],
       apply(ctx) {
         const t = ctx.locale.bind(NS)
-        ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'qwen-draw: dictionaries')
+        ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'easy-paint: dictionaries')
         ctx.slots.inject('settings.section', () => ctx.slots.register({
           name: 'settings.section',
-          id: 'qwen-draw',
+          id: 'easy-paint',
           order: 101,
           label: () => t('title'),
           locale: NS,
-        }, (props) => h(QwenDrawSettings, { ...props, t })))
+        }, (props) => h(EasyPaintSettings, { ...props, t })))
         // 输入框右侧的 ComfyUI 状态座，和旧插件同一个位置，各显示各的后端。
         ctx.slots.inject('conversation.input.right', () => ctx.slots.register({
           name: 'conversation.input.right',
-          id: 'qwen-draw-status',
+          id: 'easy-paint-status',
           order: 41,
           locale: NS,
         }, (props) => h(ComfyStatusSeat, { ...props, t })))
