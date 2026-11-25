@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "Qwen Draw",
-    "description": "A small local image generator backed by ComfyUI and the Qwen models: ships a qwen_draw tool and a native DSH settings section. Independent of dsh-qwen-paint."
+    "title": "Easy Paint",
+    "description": "Generates images through a local ComfyUI instance with three switchable architectures — Qwen-Image, SDXL and Z-Image — covering text-to-image, image-to-image and LoRA."
   }
 }
