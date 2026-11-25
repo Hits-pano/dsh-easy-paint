@@ -457,10 +457,11 @@ window.__ModuleLoader__.load({
 }
 
 /* 底部保存条 */
-/* 本机参数：顶部一行条 */
+/* 本机参数：只读检测结果，固定在设置页最后 */
 .qwd-machine {
   display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
-  margin: 0 0 14px;
+  margin: 18px 0 14px; padding-top: 6px;
+  border-top: 1px dashed rgba(128, 128, 128, .2);
   font-size: 11px; line-height: 1.5;
 }
 .qwd-machine-k { color: var(--dsw-alias-text-secondary, #8b8f96); }
@@ -507,8 +508,8 @@ window.__ModuleLoader__.load({
 .qwd-warn-row {
   display: flex; align-items: flex-start; gap: 8px;
   font-size: 12px; line-height: 1.6;
+  color: #e0b054;
 }
-.qwd-warn-row { color: #e0b054; }
 .qwd-warn-tag {
   flex: none;
   padding: 0 6px; border-radius: 4px;
@@ -631,8 +632,7 @@ window.__ModuleLoader__.load({
 }
 /* 鼠标点击不要出现焦点框，只有键盘导航才显示 */
 .qwd-fold-head:focus:not(:focus-visible) { outline: none; }
-/* 机器信息：只读检测结果，固定在最后，不折叠 */
-.qwd-machine { margin-top: 18px; padding-top: 6px; border-top: 1px dashed rgba(128, 128, 128, .2); }
+
 .qwd-field-text { min-width: 0; flex: 1 1 auto; }
 .qwd-label { font-size: 14px; line-height: 1.45; color: var(--dsw-alias-text-primary, #ededed); }
 .qwd-hint { margin-top: 3px; font-size: 12px; line-height: 1.5; color: var(--dsw-alias-text-secondary, #8b8f96); }
