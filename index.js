@@ -205,9 +205,35 @@ function respondJson(res, status, payload) {
   res.end(body)
 }
 
+/**
+ * 判断请求是不是「本机的、不是浏览器里其他网页发起的」调用。
+ *
+ * 只查 remoteAddress 挡不住跨站请求：浏览器里任何网页对
+ * http://127.0.0.1:<port> 发 fetch 时，请求是从本机进程发出的，
+ * remoteAddress 就是 127.0.0.1，第一道检查会直接放行。市场条目里
+ * 「HTTP 路由没有访问检查，网页可以调用它们」说的就是这个洞。
+ *
+ * 补两道头检查（都不依赖 DSH 0.2.3 才有的统一准入 API）：
+ *   1. Sec-Fetch-Site：现代浏览器对跨站/同站请求会带 cross-site / same-site
+ *   2. Origin：带了就必须和 Host 同源，否则视为跨站
+ * curl 和 DSH 前端自己的请求不受影响——前者不带这两个头，后者是同源 same-origin。
+ */
 function isLocalRequest(req) {
   const address = req?.socket?.remoteAddress ?? ''
-  return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1'
+  if (!(address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1')) return false
+
+  const site = req?.headers?.['sec-fetch-site']
+  if (site === 'cross-site' || site === 'same-site') return false
+
+  const origin = req?.headers?.origin
+  if (typeof origin === 'string' && origin !== '') {
+    try {
+      if (new URL(origin).host !== String(req.headers.host ?? '')) return false
+    } catch {
+      return false
+    }
+  }
+  return true
 }
 
 function readJsonBody(req, limit = 64 * 1024) {

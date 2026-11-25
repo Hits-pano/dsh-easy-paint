@@ -21,6 +21,38 @@
 
 ---
 
+## [0.4.4] - 2026-11-26
+
+修 HTTP 路由的访问检查。
+
+### 修复
+
+- **本机判断不再放行浏览器里的跨站请求**。
+
+  插件注册了 8 条 HTTP 路由（config / status / models / launch / stop /
+  vision-models / detect / draw）。原先只检查 `remoteAddress` 是不是
+  127.0.0.1，但浏览器里任何网页对 `http://127.0.0.1:<port>/api/easy-paint/...`
+  发请求时，请求就是从本机进程发出的，`remoteAddress` 就是 127.0.0.1——
+  第一道检查直接放行。
+
+  市场条目因此标注了「HTTP 路由没有 DSH 的访问检查，浏览器里打开的网页可以调用它们」。
+
+  现在补两道头检查：
+
+  - `Sec-Fetch-Site` 为 `cross-site` / `same-site` 时拒绝
+  - 带了 `Origin` 就必须和 `Host` 同源，否则拒绝
+
+  curl 调用和 DSH 前端自己的请求不受影响：前者不带这两个头，后者是 `same-origin`。
+
+### 说明
+
+DSH 的统一准入 API（`requestRejection` / `admit` / `connection.fetch.register`）
+要到 0.2.3 才有，而 0.2.3 目前只有 alpha 版——npm 上最新的两个 alpha 停在
+2026-11-22，正式版仍是 0.2.2-rc.5。所以这里用不依赖新 API 的方式加固，
+等 0.2.3 正式发布后再考虑接入统一机制。
+
+---
+
 ## [0.4.3] - 2026-11-25
 
 两处视觉一致性修正。
