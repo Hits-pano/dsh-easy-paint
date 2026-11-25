@@ -1,3 +1,5 @@
+# easy-paint 的挂载点：package.json 的 dsh.bundle.patch 指向这个文件，
+# 插件安装后由 Loader 读出要插入的插件行。id 必须和 cordis 里的行号一致。
 - insert:
     - id: easy-paint
       name: 'dsh-easy-paint'
