@@ -21,6 +21,52 @@
 
 ---
 
+## [0.3.1] - 2026-11-25
+
+v0.3.0 之后的一轮清理和修复。**这一版修了 3 个会导致功能失效的 bug，建议升级。**
+
+### 修复
+
+- **Z-Image 图生图崩溃**：`buildZImageEditWorkflow` 引用了没被插入的 `zImageBaseNodes`，一调用就 `ReferenceError`
+- **推荐数据无限递归**：`RECOMMENDED_ALL` 的定义被替换成自我调用，一调用就爆栈
+- **Z-Image 推荐表格不显示**：`setRecommendedZImage` 从未被调用（替换时缩进差 2 空格，静默失败）
+- **`sanitize` 空串覆盖默认值**：模型字段存了空串会让默认模型失效，出图报「还没选模型」。现在只对模型字段跳过空串，`outputDir` 这类空串有意义的字段保持原样
+
+### 重构
+
+- 代码里的 `qwen-draw` 标识符全部改成 `easy-paint`：
+  - locale 命名空间 `settings.qwenDraw` → `settings.easyPaint`
+  - 组件名 `QwenDrawSettings` → `EasyPaintSettings`
+  - 设置页 / 状态胶囊的槽位 id
+  - **保留**：配置字段名（`qwenSteps` 等）、架构 id（`qwen-image`）、函数名（`buildQwenWorkflow`）——改了会破坏兼容性
+- 抽出 `zImageBaseNodes` / `attachZImageNegative`，Z-Image 文生图和图生图共用 1-5 号节点
+- 抽出 `RECOMMENDED_ALL()` 常量（原来 6 处重复）
+
+### 变更
+
+- **LICENSE 版权人**：`qwen-draw contributors` → `Hits-pano`（项目名已不存在，且这是个人项目）
+- **README 安装章节**：补上预构建包下载方式，加 Windows 手动安装五步
+- **market-entry-draft.yml**：改成新仓库名和三架构描述
+
+### 新增
+
+- **CHANGELOG.md**：按版本记录三架构的演进
+- **README「关于名字」段落**：说明从 Qwen Draw 起步，改了三次名
+- **`.zip` 格式的发布包**：给 Windows 手动安装用（`.tgz` 仍是市场收录必须的）
+
+### 移除
+
+- **SDXL 推荐模型列表**：单文件架构不涉及配对，删掉后 client.js 少 116 行
+- **15 个死 locale 键**：旧 LoRA UI 和已删面板的遗留
+
+### 其他
+
+- topics 补全 `sdxl` / `z-image` / `image-generation` / `lora`
+- `package.json` 的 description 和 keywords 更新为三架构
+- 折叠面板头部补 `:focus-visible`，修按 Shift 出现的黑色焦点框
+
+---
+
 ## [0.3.0] - 2026-11-25
 
 第三个架构 Z-Image 接入，三架构支持完整。
