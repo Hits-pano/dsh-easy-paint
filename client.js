@@ -1,3 +1,15 @@
+/**
+ * easy-paint · Client 侧（设置页）
+ *
+ * 一个 lazy factory，注册到设置页的槽里，提供 6 个折叠面板：
+ * 基础 / 生图参数 / Qwen / SDXL / Z-Image / 外观。
+ *
+ * 每改一项都会和磁盘上的配置做 diff，有未保存改动时面板标题旁出现蓝点；
+ * 参数越界或模型与架构不匹配时给出预警：输入框标黄、底部汇总、
+ * 状态胶囊显示「配置待优化」。
+ *
+ * 全部样式都写在本文件的 CSS 块里，不依赖宿主组件。
+ */
 window.__ModuleLoader__.load({
   id: 'dsh-easy-paint',
   factory(require) {
