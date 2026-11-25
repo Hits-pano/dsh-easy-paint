@@ -152,9 +152,8 @@ window.__ModuleLoader__.load({
       loadFailed: '读取配置失败',
       loading: '正在读取配置…',
       modelFallback: '未能从 ComfyUI 取得模型列表，手动填写文件名。',
-      modelIncompatible: '⚠ 不兼容',
       modelNotPicked: '（未选择）',
-      modelFamilyHint: '这里只吃 Qwen-Image 家族的文件，其他架构会在下拉里标「⚠ 不兼容」。',
+      modelIncompatible: '（不兼容）',
       recTitle: '推荐模型',
       recApply: '填入已安装的推荐项',
       recColKind: '类型',
@@ -322,9 +321,8 @@ window.__ModuleLoader__.load({
       loadFailed: 'Failed to read configuration',
       loading: 'Loading configuration…',
       modelFallback: 'Could not read the model list from ComfyUI; type the file name.',
-      modelIncompatible: '⚠ incompatible',
       modelNotPicked: '(not selected)',
-      modelFamilyHint: 'This section only accepts Qwen-Image family files; other architectures are tagged as incompatible in the dropdown.',
+      modelIncompatible: '(incompatible)',
       recTitle: 'Recommended models',
       recApply: 'Fill installed ones',
       recColKind: 'Kind',
@@ -902,21 +900,6 @@ window.__ModuleLoader__.load({
      * 用排除法而不是白名单：以后新增的其它模型（Flux、SD3 等）也不会被误藏。
      * 注意不能笼统排除 "qwen" —— Z-Image 的文本编码器就叫 qwen_3_4b。
      */
-    function excludeQwenImage(list) {
-      return (list ?? []).filter((f) => !/^qwen_image|^qwen3vl/i.test(f))
-    }
-
-    /**
-     * Qwen 面板的下拉要排掉 Z-Image 专属的文件。
-     *
-     * 最容易混的是文本编码器：Z-Image 用的叫 qwen_3_4b_fp8_mixed，名字带 qwen，
-     * 但和 Qwen-Image 的 qwen3vl_8b 不是同一个文件。光看图名字会以为是 Qwen 的。
-     * ae.safetensors 也是 Z-Image 的 VAE（名字完全不带 z_image，只能单独匹配）。
-     */
-    function excludeZImage(list) {
-      return (list ?? []).filter((f) => !/^z_image|^zimage|^qwen_3_4b|^ae\.safetensors$/i.test(f))
-    }
-
     function ModelField(props) {
       const { label, hint, value, options, onChange, disabled, fallbackHint, t, compatiblePattern } = props
       const list = Array.isArray(options) ? options : []
@@ -925,8 +908,13 @@ window.__ModuleLoader__.load({
       }
       // 当前值是列表外的文件（比如刚被删掉）时也保留它，避免下拉显示成空白
       const merged = value && !list.includes(value) ? [value, ...list] : list
-      // 只有调用方传了 compatiblePattern 才做兼容性标记：Qwen 面板传 /qwen/，
-      // SDXL 面板不传——它的 checkpoint 文件本来就不含 qwen。
+      /**
+       * 兼容性判断。
+       *
+       * 不把别的架构的文件过滤掉——用户需要看到「本机装了哪些」，
+       * 否则误判时会以为插件根本没识别到。改成「全部列出 + 不兼容的置灰且不可选」：
+       * 看得见、知道为什么、但选不错。
+       */
       const isCompatible = compatiblePattern
         ? (name) => compatiblePattern.test(name)
         : () => true
@@ -944,8 +932,15 @@ window.__ModuleLoader__.load({
         // 没有选中值时必须显式给一个占位项：否则浏览器会默认显示第一个选项，
         // 但 state 里仍是空字符串，造成「看起来选了、其实没选」。
         merged.includes(value ?? '') ? null : h('option', { value: '' }, t('modelNotPicked')),
-        merged.map((option) => h('option', { key: option, value: option },
-          isCompatible(option) ? option : `${option}　${t('modelIncompatible')}`))),
+        merged.map((option) => {
+          const ok = isCompatible(option)
+          return h('option', {
+            key: option,
+            value: option,
+            // 不兼容的置灰且不可选：能看见、知道原因，但点不下去
+            disabled: !ok,
+          }, ok ? option : `${option}　${t('modelIncompatible')}`)
+        })),
       )
     }
 
@@ -1545,7 +1540,6 @@ window.__ModuleLoader__.load({
           }, refreshingModels ? t('reloading') : t('reload')),
         ),
 
-        h('p', { className: 'qwd-hint', style: { margin: '0 0 10px' } }, t('modelFamilyHint')),
         // 新用户不知道该装什么模型：列出实测可用的一套，标出本机装了哪些
         recommended
           ? h('div', { className: 'qwd-recommend' },
@@ -1589,9 +1583,10 @@ window.__ModuleLoader__.load({
             label: t('unet'),
             hint: t('unetHint'),
             value: draft.unet ?? '',
-            options: excludeZImage(models.unet),
+            options: models.unet,
             disabled,
-            fallbackHint: t('modelFallback'), compatiblePattern: /qwen/iu,
+            fallbackHint: t('modelFallback'),
+            compatiblePattern: /^qwen_image|^qwen3vl/iu,
             t,
             onChange: (v) => { patch('unet', v)},
           }),
@@ -1599,9 +1594,10 @@ window.__ModuleLoader__.load({
             label: t('clip'),
             hint: t('clipHint'),
             value: draft.clip ?? '',
-            options: excludeZImage(models.clip),
+            options: models.clip,
             disabled,
-            fallbackHint: t('modelFallback'), compatiblePattern: /qwen/iu,
+            fallbackHint: t('modelFallback'),
+            compatiblePattern: /^qwen_image|^qwen3vl/iu,
             t,
             onChange: (v) => { patch('clip', v)},
           }),
@@ -1609,9 +1605,10 @@ window.__ModuleLoader__.load({
             label: t('vae'),
             hint: t('vaeHint'),
             value: draft.vae ?? '',
-            options: excludeZImage(models.vae),
+            options: models.vae,
             disabled,
-            fallbackHint: t('modelFallback'), compatiblePattern: /qwen/iu,
+            fallbackHint: t('modelFallback'),
+            compatiblePattern: /^qwen_image|^qwen3vl/iu,
             t,
             onChange: (v) => { patch('vae', v)},
           }),
@@ -1881,9 +1878,10 @@ window.__ModuleLoader__.load({
           label: t('unet'),
           hint: t('unetHint'),
           value: draft.zImageUnet ?? '',
-          options: excludeQwenImage(models.unet),
+          options: models.unet,
           disabled,
-          fallbackHint: t('modelFallback'), compatiblePattern: /z_image|zimage/iu,
+          fallbackHint: t('modelFallback'),
+          compatiblePattern: /^z_image|^zimage/iu,
           t,
           onChange: (v) => { patch('zImageUnet', v)},
         }),
@@ -1891,9 +1889,10 @@ window.__ModuleLoader__.load({
           label: t('clip'),
           hint: t('clipHint'),
           value: draft.zImageClip ?? '',
-          options: excludeQwenImage(models.clip),
+          options: models.clip,
           disabled,
-          fallbackHint: t('modelFallback'), compatiblePattern: /qwen_3_4b/iu,
+          fallbackHint: t('modelFallback'),
+          compatiblePattern: /^qwen_3_4b/iu,
           t,
           onChange: (v) => { patch('zImageClip', v)},
         }),
@@ -1901,9 +1900,10 @@ window.__ModuleLoader__.load({
           label: t('vae'),
           hint: t('vaeHint'),
           value: draft.zImageVae ?? '',
-          options: excludeQwenImage(models.vae),
+          options: models.vae,
           disabled,
           fallbackHint: t('modelFallback'),
+          compatiblePattern: /^ae\.safetensors$/iu,
           t,
           onChange: (v) => { patch('zImageVae', v)},
         }),
