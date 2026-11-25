@@ -21,6 +21,7 @@ export const name = 'easy-paint'
 export const inject = ['tools']
 
 /** 画幅 → 像素。边长均为 16 的倍数，总像素贴近 1MP。 */
+/** 画幅预设：SDXL 与 Qwen 共用同一套比例 */
 const SIZE_PRESETS = {
   '1:1': [1024, 1024],
   '4:3': [1152, 864],
@@ -29,6 +30,27 @@ const SIZE_PRESETS = {
   '9:16': [768, 1344],
   '3:2': [1216, 832],
   '2:3': [832, 1216],
+}
+
+/**
+ * 取出本次要用的种子：调用方传了就取整用，没传就随机。
+ * 四个工作流构建函数共用，避免同一段逻辑抄四遍。
+ */
+function resolveSeed(args) {
+  const raw = Number(args?.seed)
+  if (Number.isFinite(raw)) return Math.trunc(raw)
+  return Math.floor(Math.random() * 1e15)
+}
+
+/**
+ * 把设置页的数值压进合法区间。
+ * 与旧写法 `Number(x) || fallback` 保持完全一致：0、NaN、空串都回落到 fallback。
+ * LoRA 权重例外（0 是合法值，代表关闭），那里单独处理，不走这个函数。
+ */
+function clampNumber(raw, fallback, min, max, integer = false) {
+  const value = Number(raw) || fallback
+  const bounded = Math.min(Math.max(value, min), max)
+  return integer ? Math.trunc(bounded) : bounded
 }
 
 const DEFAULTS = {
@@ -509,7 +531,7 @@ async function uploadImage(baseUrl, localPath) {
  * 往工作流里串 LoRA 链：每个 LoRA 接上一环的 (model, clip) 输出。
  * 返回最后一环的 [modelRef, clipRef] 与实际用上的个数。
  */
-function sdxlLoraChain(prompt, startModel, startClip, loras, checkpointName) {
+function sdxlLoraChain(prompt, startModel, startClip, loras) {
   let modelRef = startModel
   let clipRef = startClip
   const metaMap = modelsCache?.loraMeta ?? {}
@@ -525,8 +547,14 @@ function sdxlLoraChain(prompt, startModel, startClip, loras, checkpointName) {
   // 节点 id 从 30 起，避开主链 1-9 和参考图 20+
   list.slice(0, 5).forEach((lora, index) => {
     const id = String(30 + index)
-    const raw = Number(lora.strength)
-    const strength = Number.isFinite(raw) ? Math.min(Math.max(raw, 0), 2) : 0.8
+    // 权重 0 是合法值（等于关掉这个 LoRA），所以不能走 clampNumber 的「0 回落到默认」。
+    // 空串 / null / 非数字一律用默认 0.8。
+    const loraStrength = lora.strength
+    const numericStrength = Number(loraStrength)
+    const strength = loraStrength === '' || loraStrength === null || loraStrength === undefined
+      || !Number.isFinite(numericStrength)
+      ? 0.8
+      : Math.min(Math.max(numericStrength, 0), 2)
     prompt[id] = {
       class_type: 'LoraLoader',
       inputs: {
@@ -546,17 +574,15 @@ function sdxlLoraChain(prompt, startModel, startClip, loras, checkpointName) {
 function buildSdxlWorkflow(cfg, args) {
   const preset = SIZE_PRESETS[cfg.size] ?? SIZE_PRESETS['1:1']
   const [width, height] = preset
-  const steps = Math.min(Math.max(Math.trunc(Number(cfg.sdxlSteps) || 28), 1), 60)
-  const cfgScale = Math.min(Math.max(Number(cfg.sdxlCfg) || 7.5, 1), 20)
-  const seed = Number.isFinite(Number(args.seed))
-    ? Math.trunc(Number(args.seed))
-    : Math.floor(Math.random() * 1e15)
+  const steps = clampNumber(cfg.sdxlSteps, 28, 1, 60, true)
+  const cfgScale = clampNumber(cfg.sdxlCfg, 7.5, 1, 20)
+  const seed = resolveSeed(args)
 
   const prompt = {
     1: { class_type: 'CheckpointLoaderSimple', inputs: { ckpt_name: cfg.checkpoint } },
   }
   // 串上 LoRA 链（没配 LoRA 时 modelRef/clipRef 就是 checkpoint 的直出）
-  const { modelRef, clipRef } = sdxlLoraChain(prompt, ['1', 0], ['1', 1], cfg.sdxlLoras, cfg.checkpoint)
+  const { modelRef, clipRef } = sdxlLoraChain(prompt, ['1', 0], ['1', 1], cfg.sdxlLoras)
 
   Object.assign(prompt, {
     2: { class_type: 'CLIPTextEncode', inputs: { clip: clipRef, text: sdxlPosText(cfg, args) } },
@@ -598,13 +624,11 @@ function buildSdxlWorkflow(cfg, args) {
 function buildSdxlEditWorkflow(cfg, args, imageNames) {
   const preset = SIZE_PRESETS[cfg.size] ?? SIZE_PRESETS['1:1']
   const [width, height] = preset
-  const steps = Math.min(Math.max(Math.trunc(Number(cfg.sdxlSteps) || 28), 1), 60)
-  const cfgScale = Math.min(Math.max(Number(cfg.sdxlCfg) || 7.5, 1), 20)
+  const steps = clampNumber(cfg.sdxlSteps, 28, 1, 60, true)
+  const cfgScale = clampNumber(cfg.sdxlCfg, 7.5, 1, 20)
   // SDXL 重绘默认值比 Qwen 低：太高会变成整图重画
-  const denoise = Math.min(Math.max(Number(cfg.sdxlEditDenoise) || 0.6, 0.1), 1)
-  const seed = Number.isFinite(Number(args.seed))
-    ? Math.trunc(Number(args.seed))
-    : Math.floor(Math.random() * 1e15)
+  const denoise = clampNumber(cfg.sdxlEditDenoise, 0.6, 0.1, 1)
+  const seed = resolveSeed(args)
 
   const prompt = {
     1: { class_type: 'CheckpointLoaderSimple', inputs: { ckpt_name: cfg.checkpoint } },
@@ -612,7 +636,7 @@ function buildSdxlEditWorkflow(cfg, args, imageNames) {
     3: { class_type: 'VAEEncode', inputs: { pixels: ['2', 0], vae: ['1', 2] } },
   }
   // 图生图同样串 LoRA 链
-  const { modelRef, clipRef } = sdxlLoraChain(prompt, ['1', 0], ['1', 1], cfg.sdxlLoras, cfg.checkpoint)
+  const { modelRef, clipRef } = sdxlLoraChain(prompt, ['1', 0], ['1', 1], cfg.sdxlLoras)
   Object.assign(prompt, {
     4: { class_type: 'CLIPTextEncode', inputs: { clip: clipRef, text: sdxlPosText(cfg, args) } },
     5: { class_type: 'CLIPTextEncode', inputs: { clip: clipRef, text: sdxlNegText(cfg) } },
@@ -767,6 +791,7 @@ function comfyRoot(cfg) {
  * 多数 Civitai / A1111 训练出来的 LoRA 带这个字段；没有就返回空串。
  * header 格式：前 8 字节小端 uint64 = JSON 字节长度，紧接着是 JSON。
  */
+/** 读 LoRA 文件（safetensors）头部的 __metadata__ 里记录的底模标识，读不到返回空串 */
 async function readLoraBaseModel(filePath) {
   try {
     const handle = await open(filePath, 'r')
@@ -774,11 +799,9 @@ async function readLoraBaseModel(filePath) {
       const lenBuf = Buffer.alloc(8)
       await handle.read(lenBuf, 0, 8, 0)
       const headerLen = Number(lenBuf.readBigUInt64LE(0))
-      if (!Number.isFinite(headerLen) || headerLen <= 0 || headerLen > 50 * 1024 * 1024) {
-        return { raw: '', dbg: 'badHeaderLen=' + headerLen + ' path=' + filePath }
-      }
+      if (!Number.isFinite(headerLen) || headerLen <= 0 || headerLen > 50 * 1024 * 1024) return ''
       const headerBuf = Buffer.alloc(headerLen)
-      const r = await handle.read(headerBuf, 0, headerLen, 8)
+      await handle.read(headerBuf, 0, headerLen, 8)
       const header = JSON.parse(headerBuf.toString('utf8'))
       const meta = header?.__metadata__ ?? {}
       // 优先级：具体底模名 > 架构版本 > modelspec 架构。
@@ -788,23 +811,13 @@ async function readLoraBaseModel(filePath) {
         ?? meta.ss_base_model_version
         ?? meta['modelspec.architecture']
         ?? ''
-      const strs = typeof raw === 'string' ? raw : ''
-      if (strs === '') {
-        return {
-          raw: '',
-          dbg: 'noField headerLen=' + headerLen
-            + ' bytesRead=' + r.bytesRead
-            + ' metaKeys=' + Object.keys(meta).length
-            + ' hasSdName=' + ('ss_sd_model_name' in meta)
-            + ' path=' + filePath,
-        }
-      }
-      return { raw: strs, dbg: 'ok path=' + filePath }
+      return typeof raw === 'string' ? raw : ''
     } finally {
       await handle.close()
     }
-  } catch (error) {
-    return { raw: '', dbg: 'ERR=' + (error?.message ?? error) + ' path=' + filePath }
+  } catch {
+    // 文件读不了（权限、损坏、不是 safetensors）一律当作「判不了」，不影响出图
+    return ''
   }
 }
 
@@ -819,15 +832,6 @@ function normalizeBaseModel(raw) {
   if (s.includes('anything')) return 'sd15'
   if (s.includes('sd_v1') || s.includes('sd1') || s.includes('sd_1') || s.includes('1.5')) return 'sd15'
   return 'unknown'
-}
-
-/** 从 checkpoint 文件名猜它属于哪一系 */
-function checkpointFamily(name) {
-  const s = String(name ?? '').toLowerCase()
-  if (s.includes('illustrious')) return 'illustrious'
-  if (s.includes('pony')) return 'pony'
-  if (s.includes('noob')) return 'noob'
-  return 'sdxl'
 }
 
 /** 取架构定义，非法值回落到 Qwen-Image */
@@ -855,12 +859,10 @@ function buildQwenEditWorkflow(cfg, args, imageNames) {
   // 采样参数一律来自设置页；调用参数不参与（用户要求严格限制）
   const preset = SIZE_PRESETS[cfg.size] ?? SIZE_PRESETS['1:1']
   const [width, height] = preset
-  const steps = Math.min(Math.max(Math.trunc(Number(cfg.qwenSteps) || 10), 1), 60)
-  const cfgScale = Math.min(Math.max(Number(cfg.qwenCfg) || 1, 1), 8)
-  const denoise = Math.min(Math.max(Number(cfg.qwenEditDenoise) || 1, 0.1), 1)
-  const seed = Number.isFinite(Number(args.seed))
-    ? Math.trunc(Number(args.seed))
-    : Math.floor(Math.random() * 1e15)
+  const steps = clampNumber(cfg.qwenSteps, 10, 1, 60, true)
+  const cfgScale = clampNumber(cfg.qwenCfg, 1, 1, 8)
+  const denoise = clampNumber(cfg.qwenEditDenoise, 1, 0.1, 1)
+  const seed = resolveSeed(args)
 
   const prompt = {
     1: { class_type: 'UNETLoader', inputs: { unet_name: cfg.unet, weight_dtype: 'default' } },
@@ -915,11 +917,9 @@ function buildQwenWorkflow(cfg, args) {
   // 采样参数一律来自设置页；调用参数不参与（用户要求严格限制）
   const preset = SIZE_PRESETS[cfg.size] ?? SIZE_PRESETS['1:1']
   const [width, height] = preset
-  const steps = Math.min(Math.max(Math.trunc(Number(cfg.qwenSteps) || 10), 1), 60)
-  const cfgScale = Math.min(Math.max(Number(cfg.qwenCfg) || 1, 1), 8)
-  const seed = Number.isFinite(Number(args.seed))
-    ? Math.trunc(Number(args.seed))
-    : Math.floor(Math.random() * 1e15)
+  const steps = clampNumber(cfg.qwenSteps, 10, 1, 60, true)
+  const cfgScale = clampNumber(cfg.qwenCfg, 1, 1, 8)
+  const seed = resolveSeed(args)
 
   return {
     width,
@@ -1360,7 +1360,7 @@ async function generateImage(args, exec) {
         const beforeStart = Date.now()
         await ensureComfy(cfg)
         const startupSeconds = Math.round((Date.now() - beforeStart) / 1000)
-  
+
         // 收集参考图：image（单张）与 images（数组）合并、去重、最多 3 张
         const refPaths = []
         const single = typeof args.image === 'string' ? args.image.trim() : ''
@@ -1377,7 +1377,7 @@ async function generateImage(args, exec) {
         const maxRefs = refLimit.effective
         const usedRefs = uniqueRefs.slice(0, maxRefs)
         const ignoredRefs = uniqueRefs.length - usedRefs.length
-  
+
         // 参考图只需上传一次，多张抽卡复用同一批文件名
         let uploadedRefs = []
         if (usedRefs.length > 0) {
@@ -1396,24 +1396,24 @@ async function generateImage(args, exec) {
             ? arch.buildEdit(cfg, args, uploadedRefs)
             : arch.build(cfg, args)
         }
-  
+
         const timeoutMs = Math.max(Number(cfg.timeoutMs) || 600000, 30000)
         const outputDir = resolveOutputDir(cfg)
         const checkMode = String(cfg.selfCheck ?? 'off')
-  
+
         // 自动重试次数：0 = 只出一张；N = 连出 1+N 张（各自不同随机种子）供挑选
         const retryMax = Math.max(0, Math.min(5, Math.trunc(Number(cfg.autoRetry)) || 0))
         const total = 1 + retryMax
         const shots = []
         let lastWorkflow = null
-  
+
         for (let index = 0; index < total; index += 1) {
           // 每次重新构建工作流 → 未指定 seed 时自然抽到新种子
           const workflow = buildOnce()
           lastWorkflow = workflow
           const images = await runWorkflow(baseUrl, workflow.prompt, { timeoutMs, signal: exec?.signal })
           const file = await saveImage(baseUrl, images[0], outputDir)
-  
+
           // 图生图的尺寸由参考图决定（VAEEncode 用原图 latent），不是配置的画幅；
           // 这里用实际输出尺寸覆盖，免得工具报告和真实文件对不上
           let outputBuffer = null
@@ -1427,7 +1427,7 @@ async function generateImage(args, exec) {
           } catch {
             // 读不出来就沿用构建时的值，不阻断出图
           }
-  
+
           // 出图自检：按配置执行，任何失败都只记录不阻断——图已经出来了
           let selfCheck = { mode: 'off', ok: true, issues: [] }
           let selfCheckSeconds = 0
@@ -1446,19 +1446,19 @@ async function generateImage(args, exec) {
               selfCheckSeconds = Math.round((Date.now() - checkStart) / 1000)
             }
           }
-  
+
           shots.push({ path: file, seed: workflow.seed, selfCheck, selfCheckSeconds })
           // 多张之间留一点间隔，避免把 ComfyUI 队列挤爆
           if (index + 1 < total) await sleep(300)
         }
-  
+
         // 调用方传了已停用的采样参数：这些值被忽略，如实说明，别让用户以为设置没生效
         const ignoredArgs = []
         if (args.steps !== undefined) ignoredArgs.push('steps')
         if (args.cfg !== undefined) ignoredArgs.push('cfg')
         if (args.size !== undefined) ignoredArgs.push('size')
         if (args.negative !== undefined) ignoredArgs.push('negative')
-  
+
         const first = shots[0]
         return {
           path: first.path,
@@ -1785,7 +1785,7 @@ async function generateImage(args, exec) {
           for (const name of loras) {
             const full = join(loraDir, ...name.split('/'))
             const got = await readLoraBaseModel(full)
-            loraMeta[name] = { raw: got.raw, family: normalizeBaseModel(got.raw), dbg: got.dbg }
+            loraMeta[name] = { raw: got, family: normalizeBaseModel(got) }
           }
           const next = { unet, clip, vae, checkpoints, loras, loraMeta }
           modelsCache = next
@@ -1860,7 +1860,7 @@ async function generateImage(args, exec) {
           for (const name of names) {
             const full = join(loraDir, ...name.split('/'))
             const got = await readLoraBaseModel(full)
-            out[name] = { raw: got.raw, family: normalizeBaseModel(got.raw), dbg: got.dbg }
+            out[name] = { raw: got, family: normalizeBaseModel(got) }
           }
           return out
         })(),

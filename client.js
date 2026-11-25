@@ -907,7 +907,7 @@ window.__ModuleLoader__.load({
           value: value ?? '',
           disabled: disabled === true,
           onChange: (event) => onChange(event.target.value),
-        }, 
+        },
         // 没有选中值时必须显式给一个占位项：否则浏览器会默认显示第一个选项，
         // 但 state 里仍是空字符串，造成「看起来选了、其实没选」。
         merged.includes(value ?? '') ? null : h('option', { value: '' }, t('modelNotPicked')),
@@ -1133,6 +1133,14 @@ window.__ModuleLoader__.load({
 
       const patch = (field, raw) => setDraft((prev) => ({ ...prev, [field]: raw }))
 
+      /** 保存成功后统一同步 state：config 存服务端返回值，draft 重新拉平 */
+      const applySavedConfig = (data, fallback) => {
+        setConfig(data?.config ?? fallback)
+        setDraft({ ...(data?.config ?? {}) })
+        setBad(false)
+        setMessage(t('saved'))
+      }
+
       const save = async (field, cast, explicit) => {
         if (config === null) return
         // 下拉的 onChange 和保存发生在同一拍，draft 还没提交，所以显式传值。
@@ -1141,10 +1149,7 @@ window.__ModuleLoader__.load({
         if (next === config[field]) { setMessage(''); return }
         try {
           const data = await apiPost(API_CONFIG, { config: { [field]: next } })
-          setConfig(data?.config ?? { ...config, [field]: next })
-          setDraft({ ...(data?.config ?? {}) })
-          setBad(false)
-          setMessage(t('saved'))
+          applySavedConfig(data, { ...config, [field]: next })
         } catch (error) {
           setBad(true)
           setMessage(`${t('saveFailed')}: ${error?.message ?? error}`)
@@ -1248,10 +1253,7 @@ window.__ModuleLoader__.load({
         setSaving(true)
         try {
           const data = await apiPost(API_CONFIG, { config: patch })
-          setConfig(data?.config ?? { ...config, ...patch })
-          setDraft({ ...(data?.config ?? {}) })
-          setBad(false)
-          setMessage(t('saved'))
+          applySavedConfig(data, { ...config, ...patch })
         } catch (error) {
           setBad(true)
           setMessage(`${t('saveFailed')}: ${error?.message ?? error}`)
@@ -1306,7 +1308,6 @@ window.__ModuleLoader__.load({
               ? `${hw.hardware.vramTotalMb} MB` + (typeof hw.hardware?.vramFreeMb === 'number' ? `（空闲 ${hw.hardware.vramFreeMb} MB）` : '')
               : t('hwUnknown')),
         ),
-
 
         h('div', { className: 'qwd-conn' },
           // 左状态灯 + 中间说明 + 右侧操作按钮（离线=启动 / 在线=终止 / 生图中=禁用）
@@ -1748,8 +1749,6 @@ window.__ModuleLoader__.load({
           )
         }),
 
-
-
         // SDXL 的默认提示词（Pony 这类模型要在这里写 score_9 等质量标签）
         h(Field, {
           label: t('positivePrompt'), hint: t('sdxlPositiveHint'), type: 'textarea',
@@ -1783,7 +1782,6 @@ window.__ModuleLoader__.load({
 
         ),
 
-
         h(Fold, {
           title: t('foldAppearance'), sub: t('foldAppearanceHint'),
           open: openFolds.appearance === true, onToggle: () => toggleFold('appearance'), dirty: panelDirty('appearance'),
@@ -1794,7 +1792,6 @@ window.__ModuleLoader__.load({
           onChange: (v) => { patch('showStatusSeat', v)},
         }),
         ),
-
 
         // 全局保存：所有字段先改 draft，点这里才真正写盘
         h('div', { className: 'qwd-savebar' },
