@@ -912,36 +912,43 @@ function assertArchModels(cfg) {
  *
  * 返回空数组表示没问题。只返回「可展示的一句话」，具体措辞交给前端翻译。
  */
+/**
+ * 所有架构的参数越界检查。
+ *
+ * 注意：这里检查的是「配置文件里全部三个架构的参数」，不是只看当前选的架构。
+ * 起因是用户在设置页把 SDXL 步数改成 32（超出 25–30），但当前架构是 Qwen，
+ * 只校验当前架构就漏掉了，状态胶囊不会变黄。而设置页前端的汇总本来就覆盖
+ * 三个架构，两边行为必须一致，否则同一个问题在设置页有提示、在胶囊上没动静。
+ */
 function computeParamIssues(cfg) {
   const issues = []
-  const arch = resolveArch(cfg)
 
-  if (arch.id === 'qwen-image') {
+  // Qwen-Image：turbo 版与原生版区间不同
+  {
     const unet = String(cfg.unet ?? '').trim()
     // 没选模型不判——空字符串会被当成「非 turbo」，那是误报
-    if (unet === '') return issues
+    if (unet !== '') {
+      const turbo = unet.toLowerCase().includes('turbo')
+      const steps = Number(cfg.qwenSteps)
+      const cfgScale = Number(cfg.qwenCfg)
 
-    const turbo = unet.toLowerCase().includes('turbo')
-    const steps = Number(cfg.qwenSteps)
-    const cfgScale = Number(cfg.qwenCfg)
-
-    if (Number.isFinite(cfgScale)) {
-      if (!turbo && cfgScale < 2.5) issues.push('cfgLowNative')
-      if (!turbo && cfgScale > 4) issues.push('cfgHighNative')
-      if (turbo && cfgScale > 1) issues.push('cfgHighTurbo')
+      if (Number.isFinite(cfgScale)) {
+        if (!turbo && cfgScale < 2.5) issues.push('cfgLowNative')
+        if (!turbo && cfgScale > 4) issues.push('cfgHighNative')
+        if (turbo && cfgScale > 1) issues.push('cfgHighTurbo')
+      }
+      if (Number.isFinite(steps) && steps > 0) {
+        const low = turbo ? 8 : 20
+        const high = turbo ? 12 : 30
+        if (steps < low || steps > high) issues.push('stepsOutOfRange')
+      }
     }
-    if (Number.isFinite(steps) && steps > 0) {
-      const low = turbo ? 8 : 20
-      const high = turbo ? 12 : 30
-      if (steps < low || steps > high) issues.push('stepsOutOfRange')
-    }
-    return issues
   }
 
-  if (arch.id === 'sdxl') {
+  // SDXL：预警范围与文案里的推荐范围一致（CFG 7–8、步数 25–30）
+  {
     const steps = Number(cfg.sdxlSteps)
     const cfgScale = Number(cfg.sdxlCfg)
-    // 预警范围与文案里的推荐范围一致：CFG 7–8、步数 25–30
     if (Number.isFinite(cfgScale)) {
       if (cfgScale < 7) issues.push('sdxlCfgLow')
       if (cfgScale > 8) issues.push('sdxlCfgHigh')
@@ -949,18 +956,16 @@ function computeParamIssues(cfg) {
     if (Number.isFinite(steps) && steps > 0 && (steps < 25 || steps > 30)) {
       issues.push('sdxlStepsOutOfRange')
     }
-    return issues
   }
 
-  if (arch.id === 'z-image') {
+  // Z-Image-Turbo：按 CFG 1 训练，步数 8 是官方甜点
+  {
     const steps = Number(cfg.zImageSteps)
     const cfgScale = Number(cfg.zImageCfg)
-    // Z-Image-Turbo 按 CFG 1 训练，调高会过曝；步数 8 步是官方甜点
     if (Number.isFinite(cfgScale) && cfgScale > 1) issues.push('zimageCfgHigh')
     if (Number.isFinite(steps) && steps > 0 && (steps < 6 || steps > 12)) {
       issues.push('zimageStepsOutOfRange')
     }
-    return issues
   }
 
   return issues
