@@ -2,10 +2,8 @@
 
 > 在 [DeepSeek Harness](https://github.com/deepseek-ai) 里用本机 ComfyUI 生成图片的插件
 
-给一段描述，出一张图；给几张参考图，按描述改。全部调用本机 ComfyUI。
-
-支持 **Qwen-Image**、**SDXL**、**Z-Image** 三套架构，可在设置页切换。SDXL 侧额外支持 LoRA（最多 5 个串联）。
-
+给一段描述，出一张图；给几张参考图，按描述改。全部调用本机 ComfyUI。  
+支持 **Qwen-Image**、**SDXL**、**Z-Image** 三套架构，可在设置页切换。SDXL 侧额外支持 LoRA（最多 5 个串联）。  
 生图后可选自检：默认的「轻量」只读文件头和尺寸，不调用模型；「视觉」需手动开启，开启后会调用你选定的视觉模型检查结果——这一步的费用由模型提供方收取，插件本身不收费。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
