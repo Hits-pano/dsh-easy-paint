@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Easy Paint",
-    "description": "用本机 ComfyUI 生成图片的插件，可在 Qwen-Image、SDXL、Z-Image 三套架构间切换，支持文生图、图生图与 LoRA。"
+    "description": "用本机 ComfyUI 生成图片的插件，可在 Qwen-Image、SDXL、Z-Image 三套架构间切换，支持文生图、图生图、LoRA，参数与所选模型不匹配时会给出预警。"
   }
 }

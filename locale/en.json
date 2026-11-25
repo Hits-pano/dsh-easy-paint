@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Easy Paint",
-    "description": "Generates images through a local ComfyUI instance with three switchable architectures — Qwen-Image, SDXL and Z-Image — covering text-to-image, image-to-image and LoRA."
+    "description": "Generates images through a local ComfyUI instance with three switchable architectures — Qwen-Image, SDXL and Z-Image — covering text-to-image, image-to-image and LoRA, with warnings when settings do not match the selected model."
   }
 }

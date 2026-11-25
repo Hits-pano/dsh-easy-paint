@@ -1,7 +1,7 @@
 {
   "name": "dsh-easy-paint",
   "version": "0.4.3",
-  "description": "在 DeepSeek Harness 里用本机 ComfyUI 生成图片的插件，支持 Qwen-Image / SDXL / Z-Image 三套架构切换",
+  "description": "用本机 ComfyUI 生成图片的插件，支持 Qwen-Image / SDXL / Z-Image 三套架构切换",
   "keywords": [
     "deepseek-harness",
     "dsh",
@@ -43,11 +43,15 @@
     "CHANGELOG.md"
   ],
   "dsh": {
-    "bundle": { "patch": "./cordis.patch.yml" },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "immediately": true,
-      "inject": ["@deepseek-ai/dsh-client-ui-settings"]
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
     }
   }
 }
