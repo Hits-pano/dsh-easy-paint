@@ -2267,7 +2267,9 @@ const SEAT_STYLE = `
   white-space: nowrap;
 }
 /* 设置页用的放大变体 */
-.qwd-seat-panel { width: auto; height: 32px; padding: 0 14px; border-radius: 9px; font-size: 13px; gap: 8px; }
+/* 设置页顶部那颗：高度和字号比对话框大一号，但宽度也统一 150px。
+   13px 下「端口被占用 · 点击释放」会超过 150，所以字号降到 12px。 */
+.qwd-seat-panel { width: 150px; height: 32px; padding: 0 14px; border-radius: 9px; font-size: 12px; gap: 8px; }
 /* 填充模式：整颗胶囊从左往右被进度填满，内容压在填充层之上 */
 .qwd-seat-fill { position: relative; overflow: hidden; }
 .qwd-seat-fill::before {
