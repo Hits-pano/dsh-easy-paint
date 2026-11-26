@@ -2518,6 +2518,10 @@ const SEAT_STYLE = `
       const paramWarn = paramIssues.length > 0
       // 离线（含僵尸态）：胶囊的作用是「启动」；在线/出图中才是「终止」
       const offline = state === 'off' || state === 'unknown'
+      // 长按终止只在「非离线」时成立：离线点胶囊是启动，没有可终止的进程。
+      // 必须在下面算 label 之前定义——const 有暂时性死区，先用后定义会让整个
+      // 组件抛 ReferenceError 直接不渲染。
+      const holdActive = holding && !offline
 
       if (holdActive) {
         label = t('seatConfirmStop')
@@ -2556,8 +2560,6 @@ const SEAT_STYLE = `
         label = `${meta.archLabel} ${label}`
       }
 
-      // 长按终止只在「非离线」时成立：离线点胶囊是启动，没有可终止的进程。
-      const holdActive = holding && !offline
 
       // 确认态：把「原标签」和「终止进程」叠在同一个网格单元里。
       // 容器宽度取两者较大值，所以从正常态切到待确认态时胶囊不会变宽或变窄——
