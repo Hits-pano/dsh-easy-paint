@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./assets/icon-180.png" width="120" alt="Easy Paint">
+</p>
+
 # Easy Paint
 
 > 在 [DeepSeek Harness](https://github.com/deepseek-ai) 里用本机 ComfyUI 生成图片的插件
