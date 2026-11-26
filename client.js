@@ -2232,7 +2232,9 @@ const SEAT_STYLE = `
   box-sizing: border-box;
   width: 150px;
   height: 26px; padding: 0 9px; border-radius: 7px;
-  font-size: 12px; line-height: 1; white-space: nowrap;
+  /* 11.5px：Z-Image 满步数「Z-Image 出图中 12/12」在 12px 下量到 150.8px，
+     刚好超一点点；缩半号之后能装进 150px，其它状态也更从容 */
+  font-size: 11.5px; line-height: 1; white-space: nowrap;
   color: var(--dsw-alias-text-secondary, #8b8f96);
   background: rgba(128, 128, 128, .10);
   /* 边框取自 --qwd-seat-dot：灯是什么颜色，边框就是同色的半透明版。
@@ -2283,8 +2285,7 @@ const SEAT_STYLE = `
    否则「准备中 3s」「出图中 4/10」这种正在干活的胶囊会和灯色对不上。
    检测中（unknown）本来就是中性灰，文字也用同色，读起来更统一。 */
 .qwd-seat-on { --qwd-seat-dot: #4ea36b; color: #4ea36b; }
-/* 出图中和准备中的文字带步数 / 秒数，长度会变，不固定宽度 */
-.qwd-seat-busy { --qwd-seat-dot: #d99a3c; color: #d99a3c; width: auto; }
+.qwd-seat-busy { --qwd-seat-dot: #d99a3c; color: #d99a3c; }
 .qwd-seat-starting { --qwd-seat-dot: #4a7bd0; color: #4a7bd0; }
 .qwd-seat-off { --qwd-seat-dot: #cf6a5f; color: #cf6a5f; }
 .qwd-seat-unknown { --qwd-seat-dot: #9aa0a6; color: #9aa0a6; }
