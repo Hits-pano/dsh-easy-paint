@@ -173,6 +173,7 @@ window.__ModuleLoader__.load({
       noChanges: '没有需要保存的改动',
       resetDefault: '恢复默认',
       resetConfirm: '确定恢复',
+      resetHoldHint: '按住按钮不放，变红后再点一次',
       resetDone: '已恢复默认设置',
       saveFailed: '保存失败',
       loadFailed: '读取配置失败',
@@ -356,6 +357,7 @@ window.__ModuleLoader__.load({
       noChanges: 'Nothing to save',
       resetDefault: 'Reset to defaults',
       resetConfirm: 'Confirm reset',
+      resetHoldHint: 'Press and hold until it turns red, then click again',
       resetDone: 'Defaults restored',
       saveFailed: 'Save failed',
       loadFailed: 'Failed to read configuration',
@@ -415,6 +417,8 @@ window.__ModuleLoader__.load({
 }
 .qwd-reset-btn:hover:not(:disabled) { background-color: rgba(224, 90, 80, .1); }
 .qwd-reset-btn:disabled { opacity: .45; cursor: default; }
+/* 长按提示：和按钮同色的红字，跟按钮排在同一行 */
+.qwd-reset-hint { color: #e05a50; white-space: nowrap; }
 /* 已就绪：整块变实心红，提示「再点一次」 */
 .qwd-reset-armed {
   background: rgba(224, 90, 80, .9) !important;
@@ -1012,6 +1016,9 @@ window.__ModuleLoader__.load({
       // 恢复默认的长按进度（0-100）与是否已就绪
       const [resetFill, setResetFill] = React.useState(0)
       const [resetArmed, setResetArmed] = React.useState(false)
+      // 新用户不知道要长按：点一下就提示怎么用，4 秒后自动消失
+      const [resetHint, setResetHint] = React.useState(false)
+      const resetHintTimer = React.useRef(null)
       const resetRaf = React.useRef(null)
       // 刚填满的那一次松手不算「再点一次」，避免松手即恢复
       const justArmedRef = React.useRef(false)
@@ -1282,6 +1289,16 @@ window.__ModuleLoader__.load({
       }, [config, draft])
 
       /** 长按开始：1.2 秒内把红色填充推到 100%，到顶就 armed */
+      /** 短按没到时长：提示要长按，4 秒后自动收起 */
+      const showResetHint = React.useCallback(() => {
+        setResetHint(true)
+        if (resetHintTimer.current !== null) window.clearTimeout(resetHintTimer.current)
+        resetHintTimer.current = window.setTimeout(() => {
+          setResetHint(false)
+          resetHintTimer.current = null
+        }, 4000)
+      }, [])
+
       const startResetHold = React.useCallback(() => {
         if (resetArmed || config === null) return
         const start = Date.now()
@@ -1317,6 +1334,11 @@ window.__ModuleLoader__.load({
         }, 2000)
         return () => window.clearTimeout(timer)
       }, [resetArmed])
+
+      // 卸载时清掉提示的定时器，避免 setState 落在已卸载的组件上
+      React.useEffect(() => () => {
+        if (resetHintTimer.current !== null) window.clearTimeout(resetHintTimer.current)
+      }, [])
 
       /** 已 armed 后再点一次：把所有设置写回默认值 */
       const doReset = React.useCallback(async () => {
@@ -2208,9 +2230,14 @@ window.__ModuleLoader__.load({
             onClick: () => {
               // 长按填满的那次松手会带一次 click，跳过它；用户要再点一次才恢复
               if (justArmedRef.current) { justArmedRef.current = false; return }
+              // 没长按到时长：与其什么都不发生，不如告诉用户该怎么操作
+              if (!resetArmed) { showResetHint(); return }
               void doReset()
             },
           }, resetArmed ? t('resetConfirm') : t('resetDefault')),
+          resetHint
+            ? h('span', { className: 'qwd-save-hint qwd-reset-hint' }, t('resetHoldHint'))
+            : null,
           hasIncompatible
             ? h('span', { className: 'qwd-save-hint qwd-save-hint-warn' },
               t('incompatibleCount').replace('{n}', String(incompatibleFields.length)))
