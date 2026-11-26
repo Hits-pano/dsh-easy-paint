@@ -199,7 +199,7 @@ window.__ModuleLoader__.load({
       seatUnknown: '检测中…',
       seatTitleStop: '点击终止 ComfyUI，释放显存和端口',
       seatTitleLaunch: '点击启动 ComfyUI（端口被占时会先清掉卡死的进程）',
-      seatConfirmStop: '终止进程',
+      seatConfirmStop: '终止进程？',
       seatZombie: '端口被占用·点击处理',
       seatChecking: '自检中…',
       seatParamWarn: '配置待优化',
@@ -378,7 +378,7 @@ window.__ModuleLoader__.load({
       seatUnknown: 'Checking…',
       seatTitleStop: 'Click to stop ComfyUI and free VRAM and the port',
       seatTitleLaunch: 'Click to launch ComfyUI (a hung process holding the port is cleared first)',
-      seatConfirmStop: 'Stop process',
+      seatConfirmStop: 'Stop process?',
       seatZombie: 'Port taken - click to resolve',
       seatChecking: 'Checking…',
       seatParamWarn: 'Config needs tuning',
@@ -2290,10 +2290,21 @@ const SEAT_STYLE = `
   width: 6px; height: 6px; border-radius: 50%; flex: none;
   background: var(--qwd-seat-dot, #9aa0a6);
 }
-/* 待确认态的叠字：容器宽度取「原标签」和「终止进程」中的较宽者，
-   切换时胶囊宽度不变，避免周围元素被推来推去。 */
-.qwd-seat-stack { display: inline-grid; }
-.qwd-seat-stack > * { grid-area: 1 / 1; }
+/* 待确认态的叠字：容器宽度取「原标签」和「终止进程？」中的较宽者，
+   切换时胶囊宽度不变，避免周围元素被推来推去。
+   inline-grid 的行盒和普通 span 不同，不锁 line-height 会在 flex 里
+   垂直偏 1-2px，所以两处都钉死行高并居中。 */
+.qwd-seat-stack {
+  display: inline-grid;
+  align-items: center;
+  line-height: 1;
+  vertical-align: middle;
+}
+.qwd-seat-stack > * {
+  grid-area: 1 / 1;
+  line-height: 1;
+  align-self: center;
+}
 .qwd-seat-stack-keep { visibility: hidden; }
 .qwd-seat-stack-over { white-space: nowrap; }
 /* 设置页用的放大变体 */
