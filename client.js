@@ -200,6 +200,7 @@ window.__ModuleLoader__.load({
       seatTitleStop: '点击终止 ComfyUI，释放显存和端口',
       seatTitleLaunch: '点击启动 ComfyUI（端口被占时会先清掉卡死的进程）',
       seatConfirmStop: '终止进程？',
+      seatHoldHint: '按住不放，底部的条走满就终止',
       seatZombie: '端口被占用·点击处理',
       seatChecking: '自检中…',
       seatParamWarn: '配置待优化',
@@ -379,6 +380,7 @@ window.__ModuleLoader__.load({
       seatTitleStop: 'Click to stop ComfyUI and free VRAM and the port',
       seatTitleLaunch: 'Click to launch ComfyUI (a hung process holding the port is cleared first)',
       seatConfirmStop: 'Stop process?',
+      seatHoldHint: 'Press and hold until the bar fills to stop',
       seatZombie: 'Port taken - click to resolve',
       seatChecking: 'Checking…',
       seatParamWarn: 'Config needs tuning',
@@ -2317,10 +2319,14 @@ const SEAT_STYLE = `
   content: '';
   position: absolute; left: 0; top: 0; bottom: 0;
   width: var(--qwd-fill, 0%);
-  background: rgba(74, 123, 208, .32);
+  /* 出图进度用蓝色；长按终止时由 .qwd-seat-holding 换成红色 */
+  background: var(--qwd-fill-color, rgba(74, 123, 208, .32));
   transition: width 450ms cubic-bezier(.22, 1, .36, 1);
   pointer-events: none;
 }
+/* 长按终止：进度条要实时跟手，不能有 450ms 的过渡延迟，颜色换成红 */
+.qwd-seat-holding { --qwd-fill-color: rgba(224, 90, 80, .38); }
+.qwd-seat-holding.qwd-seat-fill::before { transition: none; }
 .qwd-seat-fill > * { position: relative; z-index: 1; }
 /* 状态色只在这里定义一次：灯用纯色，边框用同色半透明，两者不会脱节。
    前五个状态只换灯；后四个状态连文字一起换色，边框和灯仍由变量统一。 */
@@ -2480,9 +2486,11 @@ const SEAT_STYLE = `
       const t = props.t
       const variant = props.variant === 'panel' ? 'panel' : 'seat'
       const { state, meta, zombie, check, launch, stop } = useComfyControl()
-      // 终止的二次确认：点一次进入待确认，5 秒内再点才真的终止
-      const [confirming, setConfirming] = React.useState(false)
-      const confirmTimer = React.useRef(null)
+      // 终止改成和「恢复默认」一样的长按：按住胶囊，红色进度条走满 1 秒就终止，
+      // 中途松开立刻复原。这样既防误点，也不会有文案宽度跳变的问题。
+      const [holding, setHolding] = React.useState(false)
+      const [holdFill, setHoldFill] = React.useState(0)
+      const holdRaf = React.useRef(null)
       // 是否显示状态胶囊由「外观设置 → 对话框显示 ComfyUI 状态」决定
       const [seatEnabled, setSeatEnabled] = React.useState(true)
 
@@ -2497,9 +2505,9 @@ const SEAT_STYLE = `
         return () => { alive = false }
       }, [])
 
-      // 卸载时清掉确认计时器，避免对已移除的组件 setState
+      // 卸载时停掉长按的动画帧，避免对已移除的组件 setState
       React.useEffect(() => () => {
-        if (confirmTimer.current !== null) window.clearTimeout(confirmTimer.current)
+        if (holdRaf.current !== null) window.cancelAnimationFrame(holdRaf.current)
       }, [])
 
       let label
@@ -2510,12 +2518,8 @@ const SEAT_STYLE = `
       const paramWarn = paramIssues.length > 0
       // 离线（含僵尸态）：胶囊的作用是「启动」；在线/出图中才是「终止」
       const offline = state === 'off' || state === 'unknown'
-      // 在线时点了一次确认、还没点第二次就掉线了：清掉待确认态，别让「再点一次终止」
-      // 停在离线胶囊上——那时候它该显示的是「点击启动」。
-      React.useEffect(() => {
-        if (offline) setConfirming(false)
-      }, [offline])
-      if (confirming && !offline) {
+
+      if (holdActive) {
         label = t('seatConfirmStop')
       } else if (state === 'busy') {
         const p = meta.progress
@@ -2552,13 +2556,13 @@ const SEAT_STYLE = `
         label = `${meta.archLabel} ${label}`
       }
 
-      // 待确认态只在「非离线」时成立：离线点胶囊是启动，不走确认流程。
-      const confirmingActive = confirming && !offline
+      // 长按终止只在「非离线」时成立：离线点胶囊是启动，没有可终止的进程。
+      const holdActive = holding && !offline
 
       // 确认态：把「原标签」和「终止进程」叠在同一个网格单元里。
       // 容器宽度取两者较大值，所以从正常态切到待确认态时胶囊不会变宽或变窄——
       // 原标签继续占位（隐身），确认文字盖在上面。
-      const labelNode = confirmingActive
+      const labelNode = holdActive
         ? h('span', { key: 'label', className: 'qwd-seat-stack' }, [
           h('span', { key: 'keep', className: 'qwd-seat-stack-keep' }, label),
           h('span', { key: 'over', className: 'qwd-seat-stack-over' }, t('seatConfirmStop')),
@@ -2566,60 +2570,78 @@ const SEAT_STYLE = `
         : h('span', { key: 'label' }, label)
       const body = [h('span', { key: 'dot', className: 'qwd-seat-dot', 'aria-hidden': true }), labelNode]
 
-      // 填充模式：把进度百分比交给 CSS 变量，由 ::before 铺底色
-      const fillActive = fillPercent !== null
-      const fillStyle = fillActive ? { '--qwd-fill': `${fillPercent}%` } : undefined
+      // 填充模式：把进度百分比交给 CSS 变量，由 ::before 铺底色。
+      // 长按终止时用长按进度盖掉出图进度——用户按住的那根手指优先级更高。
+      const fillValue = holdActive ? holdFill : fillPercent
+      const fillActive = holdActive || fillPercent !== null
+      const fillStyle = fillActive ? { '--qwd-fill': `${fillValue}%` } : undefined
 
-      // 离线点胶囊 = 启动（含清僵尸）；在线/出图中 = 终止。标题跟着动作走。
-      const title = (confirming && !offline)
-        ? t('seatConfirmStop')
+      // 离线点胶囊 = 启动（含清僵尸）；在线/出图中按住 = 终止。标题跟着动作走。
+      const title = holdActive
+        ? t('seatHoldHint')
         : offline
           ? (meta.lastError === '' ? t('seatTitleLaunch') : `${t('seatTitleLaunch')}\n${meta.lastError}`)
           : (meta.lastError === '' ? t('seatTitleStop') : `${t('seatTitleStop')}\n${meta.lastError}`)
 
-      // 终止：先确认一次，避免误点把正在用的 ComfyUI 关掉
       const stopComfy = async () => {
-        setConfirming(false)
         await stop()
         void check()
+      }
+
+      /** 按住开始计时：1 秒走满就终止，中途松开由 cancelHold 复原 */
+      const startHold = () => {
+        if (offline || holdActive) return
+        setHolding(true)
+        const startedAt = Date.now()
+        const step = () => {
+          const pct = Math.min(100, ((Date.now() - startedAt) / 1000) * 100)
+          setHoldFill(pct)
+          if (pct >= 100) {
+            holdRaf.current = null
+            setHolding(false)
+            setHoldFill(0)
+            void stopComfy()
+            return
+          }
+          holdRaf.current = window.requestAnimationFrame(step)
+        }
+        holdRaf.current = window.requestAnimationFrame(step)
+      }
+
+      /** 松开或移出：停掉动画并清空进度 */
+      const cancelHold = () => {
+        if (holdRaf.current !== null) {
+          window.cancelAnimationFrame(holdRaf.current)
+          holdRaf.current = null
+        }
+        setHolding(false)
+        setHoldFill(0)
       }
 
       /**
        * 离线（含僵尸态）点胶囊 = 启动 ComfyUI。
        *   Host 会先探 15 秒判断是「正在启动」还是「卡死的僵尸」，是僵尸就清掉
-       *   再拉起，所以一次点击就能恢复。僵尸态不用二次确认——它本来就没在跑。
+       *   再拉起，所以一次点击就能恢复。
        *
-       * 在线 / 出图中点胶囊 = 终止 ComfyUI。
-       *   第一次点进入待确认，5 秒内再点才执行，避免误点关掉正在跑的任务。
+       * 在线 / 出图中要终止 ComfyUI 得长按 1 秒（见 startHold），短按不会误关。
        */
       const handleClick = async () => {
-        if (offline) {
-          await launch(false)
-          void check()
-          return
-        }
-        if (!confirming) {
-          setConfirming(true)
-          if (confirmTimer.current !== null) window.clearTimeout(confirmTimer.current)
-          confirmTimer.current = window.setTimeout(() => {
-            setConfirming(false)
-            confirmTimer.current = null
-          }, 5000)
-          return
-        }
-        await stopComfy()
+        if (!offline) return
+        await launch(false)
+        void check()
       }
 
       // 设置里关掉了状态胶囊就整个不渲染（设置页顶部控制条仍可用）
       if (!seatEnabled) return null
 
-      const visualState = confirmingActive ? 'stop-confirm' : (zombie ? 'zombie' : state)
+      const visualState = holdActive ? 'stop-confirm' : (zombie ? 'zombie' : state)
       // 配置待优化：整颗胶囊变黄。启动中/僵尸态/终止确认态不抢，其余一律标黄，
       // 包括离线——离线时更该知道这组参数有问题。
-      const showParamWarn = paramWarn && state !== 'starting' && !zombie && !confirmingActive
+      const showParamWarn = paramWarn && state !== 'starting' && !zombie && !holdActive
       const className = `qwd-seat qwd-seat-${visualState}`
         + (variant === 'panel' ? ' qwd-seat-panel' : '')
         + (fillActive ? ' qwd-seat-fill' : '')
+        + (holdActive ? ' qwd-seat-holding' : '')
         + (showParamWarn ? ' qwd-seat-param-warn' : '')
       // 设置页多显示一档：在线时把版本和地址带上
       const extra = variant === 'panel' && state === 'on' && meta.version !== ''
@@ -2631,6 +2653,11 @@ const SEAT_STYLE = `
         style: fillStyle,
         role: 'status',
         title,
+        onMouseDown: startHold,
+        onMouseUp: cancelHold,
+        onMouseLeave: cancelHold,
+        onTouchStart: startHold,
+        onTouchEnd: cancelHold,
         onClick: () => { void handleClick() },
       },
       h('style', null, SEAT_STYLE),
