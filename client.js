@@ -415,10 +415,10 @@ window.__ModuleLoader__.load({
 /* 标题和状态文字共用同一套色调，保证一致 */
 .qwd-lora-tone-ok { color: var(--dsw-alias-accent-primary, #6ba4ff); }
 .qwd-lora-tone-idle { color: var(--dsw-alias-text-secondary, #8b8f96); }
-.qwd-lora-tone-warn { color: #e0a86c; }
+.qwd-lora-tone-warn { color: #e0b054; }
 .qwd-lora-tone-bad { color: #e05a50; }
 .qwd-lora-note-ok { color: var(--dsw-alias-accent-primary, #6ba4ff); font-weight: 500; }
-.qwd-lora-note-warn { color: #e0a86c; font-weight: 500; }
+.qwd-lora-note-warn { color: #e0b054; font-weight: 500; }
 .qwd-lora-note-bad { color: #e05a50; font-weight: 500; }
 .qwd-lora-controls {
   display: flex; align-items: center; gap: 8px;
@@ -681,9 +681,9 @@ window.__ModuleLoader__.load({
 .qwd-cost-warn {
   margin: 2px 0 10px; padding: 8px 10px;
   font-size: 12px; line-height: 1.6;
-  color: #e0a86c;
-  background: rgba(224, 168, 108, .1);
-  border: 1px solid rgba(224, 168, 108, .3);
+  color: #e0b054;
+  background: rgba(224, 176, 84, .1);
+  border: 1px solid rgba(224, 176, 84, .3);
   border-radius: 7px;
 }
 /* 推荐模型清单 */
