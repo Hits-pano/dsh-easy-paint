@@ -383,7 +383,7 @@ window.__ModuleLoader__.load({
   color: #e05a50;
   font-size: 12px; cursor: pointer;
   background: transparent;
-  transition: background .15s, color .15s;
+  transition: background .25s ease, border-color .25s ease, color .25s ease;
 }
 .qwd-reset-btn:hover:not(:disabled) { background-color: rgba(224, 90, 80, .1); }
 .qwd-reset-btn:disabled { opacity: .45; cursor: default; }
@@ -468,7 +468,7 @@ window.__ModuleLoader__.load({
   background: transparent;
   color: var(--dsw-alias-text-primary, #ededed);
   font-size: 12px; cursor: pointer;
-  transition: background .15s, border-color .15s, color .15s;
+  transition: background .25s ease, border-color .25s ease, color .25s ease;
 }
 .qwd-save-btn:hover:not(:disabled) { background: rgba(237, 237, 237, .12); border-color: rgba(237, 237, 237, .8); }
 .qwd-save-btn:disabled { opacity: .55; cursor: default; }
@@ -1299,7 +1299,7 @@ window.__ModuleLoader__.load({
           resetArmTimer.current = window.setTimeout(() => {
             setResetArmed(false)
             resetArmTimer.current = null
-          }, 5000)
+          }, 3000)
           return
         }
         if (resetArmTimer.current !== null) {
@@ -1505,7 +1505,7 @@ window.__ModuleLoader__.load({
         if (!saveArmed) {
           setSaveArmed(true)
           if (saveArmTimer.current !== null) window.clearTimeout(saveArmTimer.current)
-          saveArmTimer.current = window.setTimeout(() => setSaveArmed(false), 5000)
+          saveArmTimer.current = window.setTimeout(() => setSaveArmed(false), 3000)
           return
         }
         if (saveArmTimer.current !== null) {
@@ -2238,6 +2238,8 @@ const SEAT_STYLE = `
   border: 1.5px solid rgba(128, 128, 128, .18);
   border-color: color-mix(in srgb, var(--qwd-seat-dot, #808080) 45%, transparent);
   cursor: pointer; user-select: none;
+  /* 状态切换时底色 / 边框 / 文字一起淡入，不是硬切 */
+  transition: background .25s ease, border-color .25s ease, color .25s ease;
 }
 .qwd-seat:hover { border-color: color-mix(in srgb, var(--qwd-seat-dot, #808080) 75%, transparent); }
 .qwd-seat-dot {
@@ -2577,7 +2579,7 @@ const SEAT_STYLE = `
           confirmTimer.current = window.setTimeout(() => {
             setConfirming(false)
             confirmTimer.current = null
-          }, 5000)
+          }, 3000)
           return
         }
         await stopComfy()
