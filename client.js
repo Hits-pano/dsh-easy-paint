@@ -2227,7 +2227,9 @@ const SEAT_STYLE = `
   /* 固定最小宽度：待确认时文案会换，宽度一变胶囊就会左右抽动。
      96px 能装下「终止进程？」这类短文案，切换时宽度保持不变。 */
   min-width: 96px;
-  height: 26px; padding: 0 9px; border-radius: 13px;
+  /* 圆角不是全圆头：和插件里的按钮（7px）、输入框（6px）保持同一套圆角，
+     全圆头（13px = 高度的一半）看着像药丸，和 DSH 的方正风格不搭 */
+  height: 26px; padding: 0 9px; border-radius: 7px;
   font-size: 12px; line-height: 1; white-space: nowrap;
   color: var(--dsw-alias-text-secondary, #8b8f96);
   background: rgba(128, 128, 128, .10);
@@ -2239,7 +2241,8 @@ const SEAT_STYLE = `
 }
 .qwd-seat:hover { border-color: color-mix(in srgb, var(--qwd-seat-dot, #808080) 75%, transparent); }
 .qwd-seat-dot {
-  width: 6px; height: 6px; border-radius: 50%; flex: none;
+  /* 圆角方形的小方块，和胶囊的圆角语言一致；6px 的正圆在屏幕上其实也分不出来 */
+  width: 6px; height: 6px; border-radius: 2px; flex: none;
   background: var(--qwd-seat-dot, #9aa0a6);
 }
 /* 待确认态：原标签继续占位（隐身），「终止进程？」绝对定位盖在它正中间。
@@ -2258,7 +2261,7 @@ const SEAT_STYLE = `
   white-space: nowrap;
 }
 /* 设置页用的放大变体 */
-.qwd-seat-panel { height: 32px; padding: 0 14px; border-radius: 16px; font-size: 13px; gap: 8px; }
+.qwd-seat-panel { height: 32px; padding: 0 14px; border-radius: 9px; font-size: 13px; gap: 8px; }
 /* 填充模式：整颗胶囊从左往右被进度填满，内容压在填充层之上 */
 .qwd-seat-fill { position: relative; overflow: hidden; }
 .qwd-seat-fill::before {

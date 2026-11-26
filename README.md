@@ -92,7 +92,7 @@ dsh plugin add Hits-pano/dsh-easy-paint
 
 对话框右下角那颗胶囊会跟着 ComfyUI 的状态变色。灯、文字、边框始终同色：
 
-<img src="./docs/seat-states.svg" width="560" alt="状态胶囊的各种状态">
+<img src="./docs/seat-states.png" width="560" alt="状态胶囊的各种状态">
 
 - **已离线**（红）点一下启动；**在线 / 出图中**点两次才终止——第一次点只把文字换成「终止进程？」，5 秒内再点才真的执行
 - 出图时胶囊里的橙色条随采样步数从左往右填充
