@@ -173,7 +173,7 @@ window.__ModuleLoader__.load({
       noChanges: '没有需要保存的改动',
       resetDefault: '恢复默认',
       resetConfirm: '确定恢复',
-      resetHoldHint: '按住按钮不放，变红后再点一次',
+      resetHoldHint: '长按 1 秒恢复默认',
       resetDone: '已恢复默认设置',
       saveFailed: '保存失败',
       loadFailed: '读取配置失败',
@@ -357,7 +357,7 @@ window.__ModuleLoader__.load({
       noChanges: 'Nothing to save',
       resetDefault: 'Reset to defaults',
       resetConfirm: 'Confirm reset',
-      resetHoldHint: 'Press and hold until it turns red, then click again',
+      resetHoldHint: 'Press and hold for 1 second to reset',
       resetDone: 'Defaults restored',
       saveFailed: 'Save failed',
       loadFailed: 'Failed to read configuration',
@@ -1303,7 +1303,7 @@ window.__ModuleLoader__.load({
         if (resetArmed || config === null) return
         const start = Date.now()
         const step = () => {
-          const pct = Math.min(100, ((Date.now() - start) / 1200) * 100)
+          const pct = Math.min(100, ((Date.now() - start) / 1000) * 100)
           setResetFill(pct)
           if (pct >= 100) {
             setResetArmed(true)
