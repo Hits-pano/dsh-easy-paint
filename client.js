@@ -199,7 +199,7 @@ window.__ModuleLoader__.load({
       seatUnknown: '检测中…',
       seatTitleStop: '点击终止 ComfyUI，释放显存和端口',
       seatTitleLaunch: '点击启动 ComfyUI（端口被占时会先清掉卡死的进程）',
-      seatConfirmStop: '再点一次终止',
+      seatConfirmStop: '终止进程',
       seatZombie: '端口被占用·点击处理',
       seatChecking: '自检中…',
       seatParamWarn: '配置待优化',
@@ -378,7 +378,7 @@ window.__ModuleLoader__.load({
       seatUnknown: 'Checking…',
       seatTitleStop: 'Click to stop ComfyUI and free VRAM and the port',
       seatTitleLaunch: 'Click to launch ComfyUI (a hung process holding the port is cleared first)',
-      seatConfirmStop: 'Click again to stop',
+      seatConfirmStop: 'Stop process',
       seatZombie: 'Port taken - click to resolve',
       seatChecking: 'Checking…',
       seatParamWarn: 'Config needs tuning',
@@ -2290,6 +2290,12 @@ const SEAT_STYLE = `
   width: 6px; height: 6px; border-radius: 50%; flex: none;
   background: var(--qwd-seat-dot, #9aa0a6);
 }
+/* 待确认态的叠字：容器宽度取「原标签」和「终止进程」中的较宽者，
+   切换时胶囊宽度不变，避免周围元素被推来推去。 */
+.qwd-seat-stack { display: inline-grid; }
+.qwd-seat-stack > * { grid-area: 1 / 1; }
+.qwd-seat-stack-keep { visibility: hidden; }
+.qwd-seat-stack-over { white-space: nowrap; }
 /* 设置页用的放大变体 */
 .qwd-seat-panel { height: 32px; padding: 0 14px; border-radius: 16px; font-size: 13px; gap: 8px; }
 .qwd-seat-meta { font-size: 11px; opacity: .7; }
@@ -2534,7 +2540,19 @@ const SEAT_STYLE = `
         label = `${meta.archLabel} ${label}`
       }
 
-      const body = [h('span', { key: 'dot', className: 'qwd-seat-dot', 'aria-hidden': true }), h('span', { key: 'label' }, label)]
+      // 待确认态只在「非离线」时成立：离线点胶囊是启动，不走确认流程。
+      const confirmingActive = confirming && !offline
+
+      // 确认态：把「原标签」和「终止进程」叠在同一个网格单元里。
+      // 容器宽度取两者较大值，所以从正常态切到待确认态时胶囊不会变宽或变窄——
+      // 原标签继续占位（隐身），确认文字盖在上面。
+      const labelNode = confirmingActive
+        ? h('span', { key: 'label', className: 'qwd-seat-stack' }, [
+          h('span', { key: 'keep', className: 'qwd-seat-stack-keep' }, label),
+          h('span', { key: 'over', className: 'qwd-seat-stack-over' }, t('seatConfirmStop')),
+        ])
+        : h('span', { key: 'label' }, label)
+      const body = [h('span', { key: 'dot', className: 'qwd-seat-dot', 'aria-hidden': true }), labelNode]
 
       // 填充模式：把进度百分比交给 CSS 变量，由 ::before 铺底色
       const fillActive = fillPercent !== null
@@ -2583,7 +2601,6 @@ const SEAT_STYLE = `
       // 设置里关掉了状态胶囊就整个不渲染（设置页顶部控制条仍可用）
       if (!seatEnabled) return null
 
-      const confirmingActive = confirming && !offline
       const visualState = confirmingActive ? 'stop-confirm' : (zombie ? 'zombie' : state)
       // 配置待优化：整颗胶囊变黄。启动中/僵尸态/终止确认态不抢，其余一律标黄，
       // 包括离线——离线时更该知道这组参数有问题。
@@ -2605,7 +2622,7 @@ const SEAT_STYLE = `
         onClick: () => { void handleClick() },
       },
       h('style', null, SEAT_STYLE),
-      confirmingActive ? h('span', null, t('seatConfirmStop')) : body,
+      body,
       extra,
       )
     }
