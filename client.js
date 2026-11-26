@@ -2301,7 +2301,9 @@ const SEAT_STYLE = `
 .qwd-seat-stop-confirm:hover { border-color: rgba(245, 132, 122, .98); }
 /* 出图中点胶囊时胶囊带进度填充层，待确认态要让位给整块红底 */
 .qwd-seat-stop-confirm::before { display: none; }
-.qwd-seat-zombie { --qwd-seat-dot: #e0a05c; color: #e0a05c; }
+/* 端口被占用归到「需要留意」这一档，和「配置待优化」同色。
+   胶囊的黄系现在只有两档：#d99a3c 橙 = 正在干活，#e0b054 黄 = 需要留意。 */
+.qwd-seat-zombie { --qwd-seat-dot: #e0b054; color: #e0b054; }
 .qwd-seat-checking { --qwd-seat-dot: #8b6fd0; color: #a08fe0; }
 /* 「配置待优化」不再单独铺黄色底：胶囊里唯一该有填充的是出图进度条，
    否则用户分不清这层底色是进度还是状态。状态靠灯色 / 文字色 / 边框色表达。 */
