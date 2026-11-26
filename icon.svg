@@ -14,9 +14,9 @@
 
   <!-- ① 笔刷：鱼头外侧，刷毛朝左上 -->
   <g transform="translate(4.6 4.0) rotate(-22 8.6 14)">
-    <path fill="#8a6a3f" d="M6.9 8.2 L9.7 8.2 L10.6 3.9 Q8.3 2.8 6.0 3.9 Z"/>
-    <rect x="6.5" y="8.0" width="3.7" height="1.9" rx="0.5" fill="#b8bec9"/>
-    <rect x="7.2" y="9.7" width="2.4" height="12.4" rx="1.2" fill="#b08a5c"/>
+    <path fill="#8a6a3f" d="M7.3 8.2 L9.5 8.2 L10.1 4.5 Q8.4 3.6 6.7 4.5 Z"/>
+    <rect x="6.9" y="8.0" width="3.0" height="1.7" rx="0.4" fill="#b8bec9"/>
+    <rect x="7.4" y="9.6" width="2.0" height="12.4" rx="1.0" fill="#b08a5c"/>
   </g>
 
   <!-- ② 鲸鱼：官方路径 -->
