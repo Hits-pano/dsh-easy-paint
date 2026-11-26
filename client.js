@@ -537,7 +537,8 @@ window.__ModuleLoader__.load({
   display: flex; align-items: center; gap: 10px; width: 100%;
 }
 .qwd-bar-title {
-  flex: none; font-size: 13px; font-weight: 500;
+  /* 和设置项标题（.qwd-fold-title）保持同一套字号和字重 */
+  flex: none; font-size: 14px; font-weight: 600;
   color: var(--dsw-alias-text-primary, #ededed);
 }
 .qwd-bar-meta {
