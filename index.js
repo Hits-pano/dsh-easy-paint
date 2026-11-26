@@ -2458,6 +2458,11 @@ async function generateImageUnlocked(args, exec) {
         await sleep(500)
         if (launchChild === null) break
       }
+      // ★ 关键：ensureComfy 还在那个最长 240 秒的等待循环里等这个进程起来。
+      // 不把启动标志复位的话，状态座会永远停在「启动中」，点启动也只回
+      // 「正在启动中」——进程明明已经没了，界面却还卡着。
+      launching = false
+      lastStartError = ''
       respondJson(res, 200, { ok: true, pid: childPid, killedLaunching: true })
       return
     }
