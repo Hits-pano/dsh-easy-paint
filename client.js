@@ -28,8 +28,6 @@ window.__ModuleLoader__.load({
     const zh = {
       title: 'Easy Paint',
       lead: '通过本机 ComfyUI 出图，支持切换模型架构。',
-      connOnline: 'ComfyUI 在线',
-      connOffline: 'ComfyUI 离线',
       endpoint: '地址',
       autoStart: '连不上时自动启动',
       autoStartHint: '出图前先探活；连不上就用下面的 python 把 ComfyUI 拉起来，再提交任务。',
@@ -143,13 +141,7 @@ window.__ModuleLoader__.load({
       vram: '显存',
       maxRefImagesOver: '⚠ 超出硬件能力上限：本机只能安全处理 {n} 张，填再多也会被压回 {n} 张；硬上更会撑爆显存卡死任务。',
       hwUnknown: '未检测到（ComfyUI 运行后自动获取）',
-      barStart: '启动',
-      barStop: '终止',
-      barDrawing: '生图中',
-      barChecking: '自检中',
-      barWorking: '处理中…',
-      barForceRestart: '强制重启',
-      barConfirmStop: '确认终止？',
+      barTitle: 'ComfyUI 状态',
       selfCheckMode: '自检强度',
       selfCheckHint: '出图后自动检查画面，失败只提示、不丢图、也不会自动重画。开启「视觉」后会用所选模型看一次图，选云端 API 时每张图和重试都会各计一次费。',
       selfCheckOff: '不自检（直接出图）',
@@ -207,8 +199,6 @@ window.__ModuleLoader__.load({
     const en = {
       title: 'Easy Paint',
       lead: 'Generates images through a local ComfyUI instance, with switchable model architectures.',
-      connOnline: 'ComfyUI online',
-      connOffline: 'ComfyUI offline',
       endpoint: 'Endpoint',
       autoStart: 'Start it when unreachable',
       autoStartHint: 'Probes before drawing; starts ComfyUI with the python below when it is down.',
@@ -322,13 +312,7 @@ window.__ModuleLoader__.load({
       vram: 'VRAM',
       maxRefImagesOver: '⚠ Above hardware limit: only {n} can be handled safely; higher values are clamped to {n} and risk VRAM exhaustion.',
       hwUnknown: 'Not detected (available once ComfyUI runs)',
-      barStart: 'Start',
-      barStop: 'Stop',
-      barDrawing: 'Drawing',
-      barChecking: 'Checking',
-      barWorking: 'Working…',
-      barForceRestart: 'Force restart',
-      barConfirmStop: 'Confirm stop?',
+      barTitle: 'ComfyUI status',
       selfCheckMode: 'Check level',
       selfCheckHint: 'Inspects the image afterwards; a failed check only warns — the image is kept and nothing is redrawn automatically. Vision calls the selected model once per image; cloud APIs bill per call.',
       selfCheckOff: 'None (use the image directly)',
@@ -552,28 +536,18 @@ window.__ModuleLoader__.load({
 .qwd-bar {
   display: flex; align-items: center; gap: 10px; width: 100%;
 }
-.qwd-bar-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-.qwd-bar-dot-on { background: #4ea36b; }
-.qwd-bar-dot-busy { background: #d99a3c; animation: qwd-seat-pulse 1.2s ease-in-out infinite; }
-.qwd-bar-dot-starting { background: #4a7bd0; animation: qwd-seat-pulse 1.2s ease-in-out infinite; }
-.qwd-bar-dot-zombie { background: #e0a05c; animation: qwd-seat-pulse 1.2s ease-in-out infinite; }
-.qwd-bar-dot-checking { background: #8b6fd0; animation: qwd-seat-pulse 1.2s ease-in-out infinite; }
-.qwd-bar-dot-off { background: #cf6a5f; }
+.qwd-bar-title {
+  flex: none; font-size: 13px; font-weight: 500;
+  color: var(--dsw-alias-text-primary, #ededed);
+}
+.qwd-bar-meta {
+  font-size: 11px; color: var(--dsw-alias-text-secondary, #8b8f96);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* 胶囊推到最右，宽度不参与 meta 的伸缩 */
+.qwd-bar > .qwd-seat { margin-left: auto; flex: none; }
 /* 与状态座同一条呼吸动画；设置页的样式表是独立的，必须自己再声明一次 */
 @keyframes qwd-seat-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
-.qwd-bar-text { font-size: 13px; color: var(--dsw-alias-text-primary, #ededed); }
-.qwd-bar-meta { font-size: 11px; color: var(--dsw-alias-text-secondary, #8b8f96); }
-.qwd-bar-btn {
-  margin-left: auto; flex: none;
-  padding: 5px 16px; font: inherit; font-size: 12px; cursor: pointer;
-  color: var(--dsw-alias-text-primary, #ededed);
-  background: transparent; border: 1px solid rgba(128, 128, 128, .32); border-radius: 6px;
-}
-.qwd-bar-btn:hover:not(:disabled) { border-color: var(--dsw-alias-accent, #4a7bd0); }
-.qwd-bar-btn:disabled { opacity: .45; cursor: not-allowed; }
-/* 待确认终止：变红提醒这是第二次点击才会执行 */
-.qwd-bar-btn-confirm { color: #e0867c; border-color: rgba(207, 106, 95, .55); }
-.qwd-bar-btn-confirm:hover:not(:disabled) { border-color: rgba(207, 106, 95, .8); }
 .qwd-group { margin: 0 0 26px; }
 .qwd-group-head {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -2279,7 +2253,6 @@ const SEAT_STYLE = `
 }
 /* 设置页用的放大变体 */
 .qwd-seat-panel { height: 32px; padding: 0 14px; border-radius: 16px; font-size: 13px; gap: 8px; }
-.qwd-seat-meta { font-size: 11px; opacity: .7; }
 /* 填充模式：整颗胶囊从左往右被进度填满，内容压在填充层之上 */
 .qwd-seat-fill { position: relative; overflow: hidden; }
 .qwd-seat-fill::before {
@@ -2608,10 +2581,6 @@ const SEAT_STYLE = `
         + (variant === 'panel' ? ' qwd-seat-panel' : '')
         + (fillActive ? ' qwd-seat-fill' : '')
         + (showParamWarn ? ' qwd-seat-param-warn' : '')
-      // 设置页多显示一档：在线时把版本和地址带上
-      const extra = variant === 'panel' && state === 'on' && meta.version !== ''
-        ? h('span', { className: 'qwd-seat-meta' }, `v${meta.version} · ${meta.endpoint}`)
-        : null
 
       return h('span', {
         className,
@@ -2627,110 +2596,21 @@ const SEAT_STYLE = `
     }
 
     /**
-     * 设置页顶部的 ComfyUI 控制条：左边状态灯、中间文字说明、最右侧按钮。
-     * 按钮随状态切换：离线=启动 / 在线=终止 / 出图中=灰色「生图中」/ 僵尸=强制重启。
+     * 设置页顶部的 ComfyUI 控制条：左边标题、中间版本和地址、右边直接复用
+     * 对话框那个状态胶囊。启停都由胶囊负责，这里不再重复放按钮——
+     * 两处的交互（离线点一下启动、在线点两次终止）保持完全一致。
      */
     function ComfyControlBar(props) {
       const t = props.t
-      const { state, meta, zombie, working, launch, stop } = useComfyControl()
-      // 终止的二次确认：点一次进入待确认，3 秒内再点才真的终止
-      const [stopArmed, setStopArmed] = React.useState(false)
-      const armTimer = React.useRef(null)
-
-      // 卸载时清掉确认计时器
-      React.useEffect(() => () => {
-        if (armTimer.current !== null) window.clearTimeout(armTimer.current)
-      }, [])
-
-      const doStop = async () => {
-        setStopArmed(false)
-        if (armTimer.current !== null) { window.clearTimeout(armTimer.current); armTimer.current = null }
-        await stop()
-      }
-
-      // 按钮三态：生图中不可点、处理中不可点、其余按在线情况切换
-      let btnLabel
-      let btnDisabled = false
-      let btnAction = null
-      if (state === 'busy') {
-        btnLabel = t('barDrawing')
-        btnDisabled = true
-      } else if (state === 'checking') {
-        btnLabel = t('barChecking')
-        btnDisabled = true
-      } else if (state === 'starting' || working) {
-        btnLabel = t('barWorking')
-        btnDisabled = true
-      } else if (state === 'on') {
-        if (stopArmed) {
-          btnLabel = t('barConfirmStop')
-          btnAction = doStop
-        } else {
-          btnLabel = t('barStop')
-          btnAction = () => {
-            setStopArmed(true)
-            if (armTimer.current !== null) window.clearTimeout(armTimer.current)
-            armTimer.current = window.setTimeout(() => {
-              setStopArmed(false)
-              armTimer.current = null
-            }, 3000)
-          }
-        }
-      } else if (zombie) {
-        btnLabel = t('barForceRestart')
-        btnAction = () => launch(true)
-      } else {
-        btnLabel = t('barStart')
-        btnAction = () => launch(false)
-      }
-
-      let label
-      if (state === 'busy') {
-        const p = meta.progress
-        if (p && typeof p.value === 'number' && typeof p.max === 'number' && p.max > 0) {
-          label = `${t('seatBusy')} ${p.value}/${p.max}`
-        } else if (typeof meta.busySince === 'number') {
-          const seconds = Math.max(0, Math.round((Date.now() - meta.busySince) / 1000))
-          label = `${t('seatPreparing')} ${seconds}s`
-        } else {
-          label = t('seatBusy')
-        }
-      } else if (state === 'starting') {
-        label = t('seatStarting')
-      } else if (state === 'checking') {
-        label = t('seatChecking')
-      } else if (state === 'on') {
-        label = t('connOnline')
-      } else if (zombie) {
-        label = t('seatZombie')
-      } else {
-        label = t('connOffline')
-      }
-
-      // 控制条也带上架构短名，和状态座保持一致
-      if (state === 'busy' && typeof meta.archLabel === 'string' && meta.archLabel !== '') {
-        label = `${meta.archLabel} ${label}`
-      }
-
-      const dotKind = state === 'on' ? 'on'
-        : state === 'busy' ? 'busy'
-          : state === 'checking' ? 'checking'
-            : state === 'starting' ? 'starting'
-              : zombie ? 'zombie' : 'off'
+      const { meta } = useComfyControl()
+      const metaText = meta.version !== '' ? `v${meta.version} · ${meta.endpoint}` : meta.endpoint
 
       return h('div', { className: 'qwd-bar' },
-        h('span', { className: `qwd-bar-dot qwd-bar-dot-${dotKind}`, 'aria-hidden': true }),
-        h('span', { className: 'qwd-bar-text' }, label),
-        state === 'on' && meta.version !== ''
-          ? h('span', { className: 'qwd-bar-meta' }, `v${meta.version} · ${meta.endpoint}`)
+        h('span', { className: 'qwd-bar-title' }, t('barTitle')),
+        meta.endpoint !== ''
+          ? h('span', { className: 'qwd-bar-meta', title: meta.endpoint }, metaText)
           : null,
-        h('button', {
-          type: 'button',
-          className: `qwd-bar-btn${stopArmed && state === 'on' ? ' qwd-bar-btn-confirm' : ''}`,
-          disabled: btnDisabled,
-          title: meta.lastError === '' ? undefined : meta.lastError,
-          onClick: () => { if (btnAction) void btnAction() },
-        }, btnLabel),
+        h(ComfyStatusSeat, { t, variant: 'panel' }),
       )
     }
 
