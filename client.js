@@ -192,7 +192,7 @@ window.__ModuleLoader__.load({
       seatTitleLaunch: '点击启动 ComfyUI（端口被占时会先清掉卡死的进程）',
       seatConfirmStop: '终止进程？',
       seatTitleConfirm: '再点一次确认终止 ComfyUI',
-      seatZombie: '端口被占用·点击处理',
+      seatZombie: '端口被占用 · 点击释放',
       seatChecking: '自检中…',
       seatParamWarn: '配置待优化',
     }
@@ -363,7 +363,7 @@ window.__ModuleLoader__.load({
       seatTitleLaunch: 'Click to launch ComfyUI (a hung process holding the port is cleared first)',
       seatConfirmStop: 'Stop process?',
       seatTitleConfirm: 'Click again to confirm stopping ComfyUI',
-      seatZombie: 'Port taken - click to resolve',
+      seatZombie: 'Port taken · click to release',
       seatChecking: 'Checking…',
       seatParamWarn: 'Config needs tuning',
     }
@@ -2303,7 +2303,9 @@ const SEAT_STYLE = `
 .qwd-seat-stop-confirm::before { display: none; }
 .qwd-seat-zombie { --qwd-seat-dot: #e0a05c; color: #e0a05c; }
 .qwd-seat-checking { --qwd-seat-dot: #8b6fd0; color: #a08fe0; }
-.qwd-seat-param-warn { --qwd-seat-dot: #e0b054; color: #e0b054; background: rgba(224, 176, 84, .1); }
+/* 「配置待优化」不再单独铺黄色底：胶囊里唯一该有填充的是出图进度条，
+   否则用户分不清这层底色是进度还是状态。状态靠灯色 / 文字色 / 边框色表达。 */
+.qwd-seat-param-warn { --qwd-seat-dot: #e0b054; color: #e0b054; }
 /* 需要呼吸的状态：颜色来自变量，这里只管动画 */
 .qwd-seat-busy .qwd-seat-dot,
 .qwd-seat-starting .qwd-seat-dot,
