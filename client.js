@@ -499,17 +499,22 @@ window.__ModuleLoader__.load({
   color: #e0b054;
   background: rgba(224, 176, 84, .1);
 }
-/* 待确认态：整块黄底 + 深色字，和「确定恢复」的整块红底同一套观感。
-   放在 warn 后面并用更长的选择器，确保盖掉 warn / dirty 的浅色底。 */
+/* 待确认态：整块填充，颜色沿用按钮自己的蓝色主调（就是「有改动」时那个蓝），
+   而不是突兀地跳到黄色——保存不是危险操作，不该用危险色。
+   用 color-mix 把主色调压深一档再铺满，白字在上面才有足够对比度。
+   放在 warn / dirty 后面并用更长的选择器，确保盖掉它们的浅色底。 */
 .qwd-save-armed,
 .qwd-save-armed.qwd-save-warn,
 .qwd-save-armed.qwd-save-dirty {
-  border-color: #e0b054;
-  background: rgba(224, 176, 84, .9);
-  color: #1b1b1b;
+  border-color: color-mix(in srgb, var(--dsw-alias-accent-primary, #6ba4ff) 78%, #0b1220);
+  background: color-mix(in srgb, var(--dsw-alias-accent-primary, #6ba4ff) 78%, #0b1220);
+  color: #ffffff;
   font-weight: 500;
 }
-.qwd-save-armed:hover:not(:disabled) { background: rgba(224, 176, 84, .98); border-color: #e0b054; }
+.qwd-save-armed:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--dsw-alias-accent-primary, #6ba4ff) 68%, #0b1220);
+  border-color: color-mix(in srgb, var(--dsw-alias-accent-primary, #6ba4ff) 68%, #0b1220);
+}
 /* 最下方的预警清单：全部用黄色，不再区分严重程度 */
 .qwd-warn-list {
   display: flex; flex-direction: column; gap: 5px;
