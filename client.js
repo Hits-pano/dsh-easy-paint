@@ -173,7 +173,6 @@ window.__ModuleLoader__.load({
       noChanges: '没有需要保存的改动',
       resetDefault: '恢复默认',
       resetConfirm: '确定恢复',
-      resetHoldHint: '长按 1 秒恢复默认',
       resetDone: '已恢复默认设置',
       saveFailed: '保存失败',
       loadFailed: '读取配置失败',
@@ -200,7 +199,7 @@ window.__ModuleLoader__.load({
       seatTitleStop: '点击终止 ComfyUI，释放显存和端口',
       seatTitleLaunch: '点击启动 ComfyUI（端口被占时会先清掉卡死的进程）',
       seatConfirmStop: '终止进程？',
-      seatHoldHint: '按住不放，底部的条走满就终止',
+      seatTitleConfirm: '再点一次确认终止 ComfyUI',
       seatZombie: '端口被占用·点击处理',
       seatChecking: '自检中…',
       seatParamWarn: '配置待优化',
@@ -353,7 +352,6 @@ window.__ModuleLoader__.load({
       noChanges: 'Nothing to save',
       resetDefault: 'Reset to defaults',
       resetConfirm: 'Confirm reset',
-      resetHoldHint: 'Press and hold for 1 second to reset',
       resetDone: 'Defaults restored',
       saveFailed: 'Save failed',
       loadFailed: 'Failed to read configuration',
@@ -380,7 +378,7 @@ window.__ModuleLoader__.load({
       seatTitleStop: 'Click to stop ComfyUI and free VRAM and the port',
       seatTitleLaunch: 'Click to launch ComfyUI (a hung process holding the port is cleared first)',
       seatConfirmStop: 'Stop process?',
-      seatHoldHint: 'Press and hold until the bar fills to stop',
+      seatTitleConfirm: 'Click again to confirm stopping ComfyUI',
       seatZombie: 'Port taken - click to resolve',
       seatChecking: 'Checking…',
       seatParamWarn: 'Config needs tuning',
@@ -400,17 +398,11 @@ window.__ModuleLoader__.load({
   border: 1px solid rgba(224, 90, 80, .65);
   color: #e05a50;
   font-size: 12px; cursor: pointer;
-  background: linear-gradient(
-    90deg,
-    rgba(224, 90, 80, .28) var(--qwd-reset-fill, 0%),
-    transparent var(--qwd-reset-fill, 0%)
-  );
-  transition: background .05s linear, color .15s;
+  background: transparent;
+  transition: background .15s, color .15s;
 }
 .qwd-reset-btn:hover:not(:disabled) { background-color: rgba(224, 90, 80, .1); }
 .qwd-reset-btn:disabled { opacity: .45; cursor: default; }
-/* 长按提示：和按钮同色的红字，跟按钮排在同一行 */
-.qwd-reset-hint { color: #e05a50; white-space: nowrap; }
 /* 已就绪：整块变实心红，提示「再点一次」 */
 .qwd-reset-armed {
   background: rgba(224, 90, 80, .9) !important;
@@ -1006,14 +998,10 @@ window.__ModuleLoader__.load({
       // 后端推导出的 models 目录，用作输入框占位提示
       const [autoModelsDir, setAutoModelsDir] = React.useState('')
       // 恢复默认的长按进度（0-100）与是否已就绪
-      const [resetFill, setResetFill] = React.useState(0)
       const [resetArmed, setResetArmed] = React.useState(false)
-      // 新用户不知道要长按：点一下就提示怎么用，4 秒后自动消失
-      const [resetHint, setResetHint] = React.useState(false)
-      const resetHintTimer = React.useRef(null)
-      const resetRaf = React.useRef(null)
-      // 刚填满的那一次松手不算「再点一次」，避免松手即恢复
-      const justArmedRef = React.useRef(false)
+
+      const resetArmTimer = React.useRef(null)
+
       const [hw, setHw] = React.useState({ hardware: null, refLimit: null })
       const [visionModels, setVisionModels] = React.useState([])
       const [loadingVision, setLoadingVision] = React.useState(false)
@@ -1281,57 +1269,6 @@ window.__ModuleLoader__.load({
       }, [config, draft])
 
       /** 长按开始：1.2 秒内把红色填充推到 100%，到顶就 armed */
-      /** 短按没到时长：提示要长按，4 秒后自动收起 */
-      const showResetHint = React.useCallback(() => {
-        setResetHint(true)
-        if (resetHintTimer.current !== null) window.clearTimeout(resetHintTimer.current)
-        resetHintTimer.current = window.setTimeout(() => {
-          setResetHint(false)
-          resetHintTimer.current = null
-        }, 4000)
-      }, [])
-
-      const startResetHold = React.useCallback(() => {
-        if (resetArmed || config === null) return
-        const start = Date.now()
-        const step = () => {
-          const pct = Math.min(100, ((Date.now() - start) / 1000) * 100)
-          setResetFill(pct)
-          if (pct >= 100) {
-            setResetArmed(true)
-            justArmedRef.current = true
-            return
-          }
-          resetRaf.current = window.requestAnimationFrame(step)
-        }
-        resetRaf.current = window.requestAnimationFrame(step)
-      }, [resetArmed, config])
-
-      /** 松开或移出：没到顶就清零重来 */
-      const cancelResetHold = React.useCallback(() => {
-        if (resetRaf.current !== null) {
-          window.cancelAnimationFrame(resetRaf.current)
-          resetRaf.current = null
-        }
-        if (!resetArmed) setResetFill(0)
-      }, [resetArmed])
-
-      // armed 后 2 秒无人确认就自动复位，避免一直停在红色状态
-      React.useEffect(() => {
-        if (!resetArmed) return undefined
-        const timer = window.setTimeout(() => {
-          setResetArmed(false)
-          setResetFill(0)
-          justArmedRef.current = false
-        }, 2000)
-        return () => window.clearTimeout(timer)
-      }, [resetArmed])
-
-      // 卸载时清掉提示的定时器，避免 setState 落在已卸载的组件上
-      React.useEffect(() => () => {
-        if (resetHintTimer.current !== null) window.clearTimeout(resetHintTimer.current)
-      }, [])
-
       /** 已 armed 后再点一次：把所有设置写回默认值 */
       const doReset = React.useCallback(async () => {
         if (!resetArmed || config === null) return
@@ -1348,9 +1285,35 @@ window.__ModuleLoader__.load({
         } finally {
           setSaving(false)
           setResetArmed(false)
-          setResetFill(0)
         }
       }, [resetArmed, config, defaults, t])
+
+      /**
+       * 恢复默认的点击入口：和保存按钮一样两步确认。
+       * 第一次点只把按钮换成「确定恢复？」并开始 5 秒倒计时，再点一次才执行。
+       */
+      const requestReset = React.useCallback(() => {
+        if (saving || disabled || config === null) return
+        if (!resetArmed) {
+          setResetArmed(true)
+          if (resetArmTimer.current !== null) window.clearTimeout(resetArmTimer.current)
+          resetArmTimer.current = window.setTimeout(() => {
+            setResetArmed(false)
+            resetArmTimer.current = null
+          }, 5000)
+          return
+        }
+        if (resetArmTimer.current !== null) {
+          window.clearTimeout(resetArmTimer.current)
+          resetArmTimer.current = null
+        }
+        void doReset()
+      }, [saving, disabled, config, resetArmed, doReset])
+
+      // 卸载时清计时器，避免对已卸载的组件 setState
+      React.useEffect(() => () => {
+        if (resetArmTimer.current !== null) window.clearTimeout(resetArmTimer.current)
+      }, [])
 
       /** 有改动但还没保存的字段（draft 与已存值不同的键） */
       const dirtyFields = React.useMemo(() => {
@@ -1532,17 +1495,15 @@ window.__ModuleLoader__.load({
       const hasParamWarn = paramWarnings.length > 0
 
       /**
-       * 保存按钮的点击入口。
+       * 保存按钮的点击入口：始终两步确认。
        *
-       * 有预警（参数越界或模型不兼容）时，第一次点击不写盘，只把按钮文字
-       * 换成「确认保存？」并开始倒计时；5 秒内再点一次才真保存。
-       * 这样误触不会直接把有问题的配置存进去，但也不会像 window.confirm
-       * 那样打断输入或挡住页面。
+       * 第一次点击不写盘，只把按钮文字换成「确认保存？」并开始倒计时；
+       * 5 秒内再点一次才真保存。误触不会直接把配置存进去，也不会像
+       * window.confirm 那样打断输入或挡住页面。
        */
       const requestSave = () => {
         if (saving || disabled || dirtyFields.length === 0) return
-        const needsConfirm = hasIncompatible || hasParamWarn
-        if (needsConfirm && !saveArmed) {
+        if (!saveArmed) {
           setSaveArmed(true)
           if (saveArmTimer.current !== null) window.clearTimeout(saveArmTimer.current)
           saveArmTimer.current = window.setTimeout(() => setSaveArmed(false), 5000)
@@ -2212,24 +2173,9 @@ window.__ModuleLoader__.load({
           h('button', {
             type: 'button',
             className: resetArmed ? 'qwd-reset-btn qwd-reset-armed' : 'qwd-reset-btn',
-            style: resetArmed ? undefined : { '--qwd-reset-fill': `${resetFill}%` },
             disabled: disabled || saving,
-            onMouseDown: startResetHold,
-            onMouseUp: cancelResetHold,
-            onMouseLeave: cancelResetHold,
-            onTouchStart: startResetHold,
-            onTouchEnd: cancelResetHold,
-            onClick: () => {
-              // 长按填满的那次松手会带一次 click，跳过它；用户要再点一次才恢复
-              if (justArmedRef.current) { justArmedRef.current = false; return }
-              // 没长按到时长：与其什么都不发生，不如告诉用户该怎么操作
-              if (!resetArmed) { showResetHint(); return }
-              void doReset()
-            },
+            onClick: () => { requestReset() },
           }, resetArmed ? t('resetConfirm') : t('resetDefault')),
-          resetHint
-            ? h('span', { className: 'qwd-save-hint qwd-reset-hint' }, t('resetHoldHint'))
-            : null,
           hasIncompatible
             ? h('span', { className: 'qwd-save-hint qwd-save-hint-warn' },
               t('incompatibleCount').replace('{n}', String(incompatibleFields.length)))
@@ -2319,14 +2265,10 @@ const SEAT_STYLE = `
   content: '';
   position: absolute; left: 0; top: 0; bottom: 0;
   width: var(--qwd-fill, 0%);
-  /* 出图进度用蓝色；长按终止时由 .qwd-seat-holding 换成红色 */
-  background: var(--qwd-fill-color, rgba(74, 123, 208, .32));
+  background: rgba(74, 123, 208, .32);
   transition: width 450ms cubic-bezier(.22, 1, .36, 1);
   pointer-events: none;
 }
-/* 长按终止：进度条要实时跟手，不能有 450ms 的过渡延迟，颜色换成红 */
-.qwd-seat-holding { --qwd-fill-color: rgba(224, 90, 80, .38); }
-.qwd-seat-holding.qwd-seat-fill::before { transition: none; }
 .qwd-seat-fill > * { position: relative; z-index: 1; }
 /* 状态色只在这里定义一次：灯用纯色，边框用同色半透明，两者不会脱节。
    前五个状态只换灯；后四个状态连文字一起换色，边框和灯仍由变量统一。 */
@@ -2486,11 +2428,10 @@ const SEAT_STYLE = `
       const t = props.t
       const variant = props.variant === 'panel' ? 'panel' : 'seat'
       const { state, meta, zombie, check, launch, stop } = useComfyControl()
-      // 终止改成和「恢复默认」一样的长按：按住胶囊，红色进度条走满 1 秒就终止，
-      // 中途松开立刻复原。这样既防误点，也不会有文案宽度跳变的问题。
-      const [holding, setHolding] = React.useState(false)
-      const [holdFill, setHoldFill] = React.useState(0)
-      const holdRaf = React.useRef(null)
+      // 终止改成两步确认：第一次点把文字换成「终止进程？」并开始 5 秒倒计时，
+      // 再点一次才真的终止。和设置页的「保存 / 恢复默认」保持同一套交互。
+      const [confirming, setConfirming] = React.useState(false)
+      const confirmTimer = React.useRef(null)
       // 是否显示状态胶囊由「外观设置 → 对话框显示 ComfyUI 状态」决定
       const [seatEnabled, setSeatEnabled] = React.useState(true)
 
@@ -2505,9 +2446,9 @@ const SEAT_STYLE = `
         return () => { alive = false }
       }, [])
 
-      // 卸载时停掉长按的动画帧，避免对已移除的组件 setState
+      // 卸载时清掉确认计时器，避免对已移除的组件 setState
       React.useEffect(() => () => {
-        if (holdRaf.current !== null) window.cancelAnimationFrame(holdRaf.current)
+        if (confirmTimer.current !== null) window.clearTimeout(confirmTimer.current)
       }, [])
 
       let label
@@ -2518,12 +2459,12 @@ const SEAT_STYLE = `
       const paramWarn = paramIssues.length > 0
       // 离线（含僵尸态）：胶囊的作用是「启动」；在线/出图中才是「终止」
       const offline = state === 'off' || state === 'unknown'
-      // 长按终止只在「非离线」时成立：离线点胶囊是启动，没有可终止的进程。
+      // 待确认态只在「非离线」时成立：离线点胶囊是启动，没有可终止的进程。
       // 必须在下面算 label 之前定义——const 有暂时性死区，先用后定义会让整个
       // 组件抛 ReferenceError 直接不渲染。
-      const holdActive = holding && !offline
+      const confirmingActive = confirming && !offline
 
-      if (holdActive) {
+      if (confirmingActive) {
         label = t('seatConfirmStop')
       } else if (state === 'busy') {
         const p = meta.progress
@@ -2564,7 +2505,7 @@ const SEAT_STYLE = `
       // 确认态：把「原标签」和「终止进程」叠在同一个网格单元里。
       // 容器宽度取两者较大值，所以从正常态切到待确认态时胶囊不会变宽或变窄——
       // 原标签继续占位（隐身），确认文字盖在上面。
-      const labelNode = holdActive
+      const labelNode = confirmingActive
         ? h('span', { key: 'label', className: 'qwd-seat-stack' }, [
           h('span', { key: 'keep', className: 'qwd-seat-stack-keep' }, label),
           h('span', { key: 'over', className: 'qwd-seat-stack-over' }, t('seatConfirmStop')),
@@ -2572,78 +2513,59 @@ const SEAT_STYLE = `
         : h('span', { key: 'label' }, label)
       const body = [h('span', { key: 'dot', className: 'qwd-seat-dot', 'aria-hidden': true }), labelNode]
 
-      // 填充模式：把进度百分比交给 CSS 变量，由 ::before 铺底色。
-      // 长按终止时用长按进度盖掉出图进度——用户按住的那根手指优先级更高。
-      const fillValue = holdActive ? holdFill : fillPercent
-      const fillActive = holdActive || fillPercent !== null
-      const fillStyle = fillActive ? { '--qwd-fill': `${fillValue}%` } : undefined
+      // 填充模式：把进度百分比交给 CSS 变量，由 ::before 铺底色
+      const fillActive = fillPercent !== null
+      const fillStyle = fillActive ? { '--qwd-fill': `${fillPercent}%` } : undefined
 
-      // 离线点胶囊 = 启动（含清僵尸）；在线/出图中按住 = 终止。标题跟着动作走。
-      const title = holdActive
-        ? t('seatHoldHint')
+      // 离线点胶囊 = 启动（含清僵尸）；在线/出图中点两次 = 终止。标题跟着动作走。
+      const title = confirmingActive
+        ? t('seatTitleConfirm')
         : offline
           ? (meta.lastError === '' ? t('seatTitleLaunch') : `${t('seatTitleLaunch')}\n${meta.lastError}`)
           : (meta.lastError === '' ? t('seatTitleStop') : `${t('seatTitleStop')}\n${meta.lastError}`)
 
       const stopComfy = async () => {
+        setConfirming(false)
         await stop()
         void check()
       }
 
-      /** 按住开始计时：1 秒走满就终止，中途松开由 cancelHold 复原 */
-      const startHold = () => {
-        if (offline || holdActive) return
-        setHolding(true)
-        const startedAt = Date.now()
-        const step = () => {
-          const pct = Math.min(100, ((Date.now() - startedAt) / 1000) * 100)
-          setHoldFill(pct)
-          if (pct >= 100) {
-            holdRaf.current = null
-            setHolding(false)
-            setHoldFill(0)
-            void stopComfy()
-            return
-          }
-          holdRaf.current = window.requestAnimationFrame(step)
-        }
-        holdRaf.current = window.requestAnimationFrame(step)
-      }
-
-      /** 松开或移出：停掉动画并清空进度 */
-      const cancelHold = () => {
-        if (holdRaf.current !== null) {
-          window.cancelAnimationFrame(holdRaf.current)
-          holdRaf.current = null
-        }
-        setHolding(false)
-        setHoldFill(0)
-      }
-
       /**
-       * 离线（含僵尸态）点胶囊 = 启动 ComfyUI。
+       * 离线（含僵尸态）点胶囊 = 启动 ComfyUI，一次点击即可。
        *   Host 会先探 15 秒判断是「正在启动」还是「卡死的僵尸」，是僵尸就清掉
-       *   再拉起，所以一次点击就能恢复。
+       *   再拉起，所以不用额外确认。
        *
-       * 在线 / 出图中要终止 ComfyUI 得长按 1 秒（见 startHold），短按不会误关。
+       * 在线 / 出图中要终止 ComfyUI 得点两次：第一次只换文字并开始 5 秒倒计时，
+       * 再点一次才真的终止，避免误触把正在跑的任务关掉。
        */
       const handleClick = async () => {
-        if (!offline) return
-        await launch(false)
-        void check()
+        if (offline) {
+          await launch(false)
+          void check()
+          return
+        }
+        if (!confirming) {
+          setConfirming(true)
+          if (confirmTimer.current !== null) window.clearTimeout(confirmTimer.current)
+          confirmTimer.current = window.setTimeout(() => {
+            setConfirming(false)
+            confirmTimer.current = null
+          }, 5000)
+          return
+        }
+        await stopComfy()
       }
 
       // 设置里关掉了状态胶囊就整个不渲染（设置页顶部控制条仍可用）
       if (!seatEnabled) return null
 
-      const visualState = holdActive ? 'stop-confirm' : (zombie ? 'zombie' : state)
+      const visualState = confirmingActive ? 'stop-confirm' : (zombie ? 'zombie' : state)
       // 配置待优化：整颗胶囊变黄。启动中/僵尸态/终止确认态不抢，其余一律标黄，
       // 包括离线——离线时更该知道这组参数有问题。
-      const showParamWarn = paramWarn && state !== 'starting' && !zombie && !holdActive
+      const showParamWarn = paramWarn && state !== 'starting' && !zombie && !confirmingActive
       const className = `qwd-seat qwd-seat-${visualState}`
         + (variant === 'panel' ? ' qwd-seat-panel' : '')
         + (fillActive ? ' qwd-seat-fill' : '')
-        + (holdActive ? ' qwd-seat-holding' : '')
         + (showParamWarn ? ' qwd-seat-param-warn' : '')
       // 设置页多显示一档：在线时把版本和地址带上
       const extra = variant === 'panel' && state === 'on' && meta.version !== ''
@@ -2655,11 +2577,6 @@ const SEAT_STYLE = `
         style: fillStyle,
         role: 'status',
         title,
-        onMouseDown: startHold,
-        onMouseUp: cancelHold,
-        onMouseLeave: cancelHold,
-        onTouchStart: startHold,
-        onTouchEnd: cancelHold,
         onClick: () => { void handleClick() },
       },
       h('style', null, SEAT_STYLE),
