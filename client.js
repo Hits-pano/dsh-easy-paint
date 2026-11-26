@@ -405,8 +405,8 @@ window.__ModuleLoader__.load({
 .qwd-reset-btn:disabled { opacity: .45; cursor: default; }
 /* 已就绪：整块变实心红，提示「再点一次」 */
 .qwd-reset-armed {
-  background: rgba(224, 90, 80, .9) !important;
-  border-color: #e05a50;
+  background: rgba(176, 82, 74, .95) !important;
+  border-color: rgba(176, 82, 74, .98);
   color: #fff;
   font-weight: 500;
 }
@@ -506,14 +506,14 @@ window.__ModuleLoader__.load({
 .qwd-save-armed,
 .qwd-save-armed.qwd-save-warn,
 .qwd-save-armed.qwd-save-dirty {
-  border-color: color-mix(in srgb, var(--dsw-alias-accent-primary, #6ba4ff) 78%, #0b1220);
-  background: color-mix(in srgb, var(--dsw-alias-accent-primary, #6ba4ff) 78%, #0b1220);
+  border-color: color-mix(in srgb, var(--dsw-alias-accent-primary, #6ba4ff) 62%, #0b1220);
+  background: color-mix(in srgb, var(--dsw-alias-accent-primary, #6ba4ff) 62%, #0b1220);
   color: #ffffff;
   font-weight: 500;
 }
 .qwd-save-armed:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--dsw-alias-accent-primary, #6ba4ff) 68%, #0b1220);
-  border-color: color-mix(in srgb, var(--dsw-alias-accent-primary, #6ba4ff) 68%, #0b1220);
+  background: color-mix(in srgb, var(--dsw-alias-accent-primary, #6ba4ff) 52%, #0b1220);
+  border-color: color-mix(in srgb, var(--dsw-alias-accent-primary, #6ba4ff) 52%, #0b1220);
 }
 /* 最下方的预警清单：全部用黄色，不再区分严重程度 */
 .qwd-warn-list {
@@ -2283,7 +2283,8 @@ const SEAT_STYLE = `
   content: '';
   position: absolute; left: 0; top: 0; bottom: 0;
   width: var(--qwd-fill, 0%);
-  background: rgba(74, 123, 208, .32);
+  /* 和「出图中」的状态色 #d99a3c 同系，半透明铺底 */
+  background: rgba(217, 154, 60, .32);
   transition: width 450ms cubic-bezier(.22, 1, .36, 1);
   pointer-events: none;
 }
@@ -2300,8 +2301,9 @@ const SEAT_STYLE = `
    灯也转白，边框跟灯走（边框颜色统一由 --qwd-seat-dot 派生）。 */
 .qwd-seat-stop-confirm {
   --qwd-seat-dot: #ffffff;
-  background: rgba(224, 90, 80, .85);
-  border-color: rgba(224, 90, 80, .95);
+  /* 比状态红 #cf6a5f 再压暗一档，作为整块填充不刺眼，白字对比度也更高 */
+  background: rgba(176, 82, 74, .94);
+  border-color: rgba(176, 82, 74, .98);
   color: #ffffff;
 }
 /* 出图中点胶囊时胶囊带进度填充层，待确认态要让位给整块红底 */
