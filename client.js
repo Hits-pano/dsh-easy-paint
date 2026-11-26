@@ -1243,10 +1243,6 @@ window.__ModuleLoader__.load({
         }
       }
 
-      const numberCast = (raw) => {
-        const value = Number(raw)
-        return Number.isFinite(value) ? value : 0
-      }
 
       const disabled = config === null
 
