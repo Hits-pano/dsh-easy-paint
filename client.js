@@ -540,7 +540,8 @@ window.__ModuleLoader__.load({
 }
 /* 标题和版本地址上下堆叠，左边不再拆成两列 */
 .qwd-bar-info {
-  display: flex; flex-direction: column; gap: 1px;
+  /* gap 和下面设置项副标题的 margin-top: 2px 对齐，两栏总高度才会一样 */
+  display: flex; flex-direction: column; gap: 2px;
   min-width: 0; flex: 1 1 auto;
 }
 .qwd-bar-title {
@@ -549,7 +550,8 @@ window.__ModuleLoader__.load({
   color: var(--dsw-alias-text-primary, #ededed);
 }
 .qwd-bar-meta {
-  font-size: 11px; color: var(--dsw-alias-text-secondary, #8b8f96);
+  /* 和 .qwd-fold-sub 同字号，两栏行高一致 */
+  font-size: 12px; color: var(--dsw-alias-text-secondary, #8b8f96);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 /* 胶囊推到最右，宽度不参与 meta 的伸缩 */
