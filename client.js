@@ -405,8 +405,8 @@ window.__ModuleLoader__.load({
 .qwd-reset-btn:disabled { opacity: .45; cursor: default; }
 /* 已就绪：整块变实心红，提示「再点一次」 */
 .qwd-reset-armed {
-  background: rgba(176, 82, 74, .95) !important;
-  border-color: rgba(176, 82, 74, .98);
+  background: rgba(176, 82, 74, .45) !important;
+  border-color: rgba(224, 90, 80, .95);
   color: #fff;
   font-weight: 500;
 }
@@ -506,14 +506,15 @@ window.__ModuleLoader__.load({
 .qwd-save-armed,
 .qwd-save-armed.qwd-save-warn,
 .qwd-save-armed.qwd-save-dirty {
-  border-color: color-mix(in srgb, var(--dsw-alias-accent-primary, #6ba4ff) 62%, #0b1220);
-  background: color-mix(in srgb, var(--dsw-alias-accent-primary, #6ba4ff) 62%, #0b1220);
+  /* 同上：半透明主色填充，边框用完全不透明的主色，边框比填充亮 */
+  border-color: var(--dsw-alias-accent-primary, #6ba4ff);
+  background: color-mix(in srgb, var(--dsw-alias-accent-primary, #6ba4ff) 48%, transparent);
   color: #ffffff;
   font-weight: 500;
 }
 .qwd-save-armed:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--dsw-alias-accent-primary, #6ba4ff) 52%, #0b1220);
-  border-color: color-mix(in srgb, var(--dsw-alias-accent-primary, #6ba4ff) 52%, #0b1220);
+  background: color-mix(in srgb, var(--dsw-alias-accent-primary, #6ba4ff) 60%, transparent);
+  border-color: var(--dsw-alias-accent-primary, #6ba4ff);
 }
 /* 最下方的预警清单：全部用黄色，不再区分严重程度 */
 .qwd-warn-list {
@@ -2301,9 +2302,10 @@ const SEAT_STYLE = `
    灯也转白，边框跟灯走（边框颜色统一由 --qwd-seat-dot 派生）。 */
 .qwd-seat-stop-confirm {
   --qwd-seat-dot: #ffffff;
-  /* 比状态红 #cf6a5f 再压暗一档，作为整块填充不刺眼，白字对比度也更高 */
-  background: rgba(176, 82, 74, .94);
-  border-color: rgba(176, 82, 74, .98);
+  /* 半透明暗红填充：能透出胶囊原本的灰底，边框仍然清晰、
+     而且边框比填充亮一档，整块看着像「描红填色」而不是实心块。 */
+  background: rgba(176, 82, 74, .42);
+  border-color: rgba(224, 90, 80, .95);
   color: #ffffff;
 }
 /* 出图中点胶囊时胶囊带进度填充层，待确认态要让位给整块红底 */
