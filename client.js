@@ -2293,13 +2293,14 @@ const SEAT_STYLE = `
 }
 .qwd-seat-fill > * { position: relative; z-index: 1; }
 /* 状态色只在这里定义一次：灯用纯色，边框用同色半透明，两者不会脱节。
-   三个主状态（在线绿 / 启动中蓝 / 已离线红）灯和文字一起上色，一眼能读出
-   当前处于哪个阶段；出图中和检测中只换灯，文字保持中性。 */
+   下面五个状态都是灯和文字一起上色，文字不再留在默认灰上——
+   否则「准备中 3s」「出图中 4/10」这种正在干活的胶囊会和灯色对不上。
+   检测中（unknown）本来就是中性灰，文字也用同色，读起来更统一。 */
 .qwd-seat-on { --qwd-seat-dot: #4ea36b; color: #4ea36b; }
-.qwd-seat-busy { --qwd-seat-dot: #d99a3c; }
+.qwd-seat-busy { --qwd-seat-dot: #d99a3c; color: #d99a3c; }
 .qwd-seat-starting { --qwd-seat-dot: #4a7bd0; color: #4a7bd0; }
 .qwd-seat-off { --qwd-seat-dot: #cf6a5f; color: #cf6a5f; }
-.qwd-seat-unknown { --qwd-seat-dot: #9aa0a6; }
+.qwd-seat-unknown { --qwd-seat-dot: #9aa0a6; color: #9aa0a6; }
 /* 待确认态：整块红底 + 白字，和「确定恢复」的确定态一致。
    灯也转白，边框跟灯走（边框颜色统一由 --qwd-seat-dot 派生）。 */
 .qwd-seat-stop-confirm {
