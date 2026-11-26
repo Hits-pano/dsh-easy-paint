@@ -1516,9 +1516,9 @@ async function ensureComfy(cfg) {
     throw new Error(`连不上 ComfyUI（${baseUrl}）：${health.reason}。自动启动已在设置里关闭。`)
   }
 
-  // ★ 端口有人监听但 HTTP 不通：可能对方正在启动，也可能是异常占用。
-  //   这时不能盲目再拉一个（会撞端口），也不能无限等（异常占用会永远卡住），
-  //   所以给一个有限的等待窗口，等不到就带着排查线索报错。
+  // 端口有人监听但 HTTP 不通：可能正在启动，也可能是显存溢出后卡死的僵尸进程。
+  // 先给一个有限的等待窗口（正常启动也要时间），等不到再判断占用者身份——
+  // 是 python 就清掉重来，不是就带着排查线索报错，绝不盲杀。
   const port = Number(comfyPort(baseUrl))
   if (Number.isFinite(port) && await isPortOpen(port)) {
     const waitMs = Math.max(Number(cfg.portWaitMs) || 60000, 5000)
@@ -1528,13 +1528,29 @@ async function ensureComfy(cfg) {
       health = await checkComfy(baseUrl)
       if (health.online) return health
     }
-    throw new Error(
-      `端口 ${port} 有程序在监听，但 ${Math.round(waitMs / 1000)} 秒内一直没有响应 ComfyUI 的接口。`
-      + ` 可能的情况：① ComfyUI 还在加载（稍后直接重试出图即可）`
-      + ` ② 端口被别的程序占用 ③ ComfyUI 进程卡死。`
-      + ` 排查占用者：netstat -ano | findstr :${port}。`
-      + ` 确认后要么结束占用进程，要么在设置里把 ComfyUI 地址改到别的端口。`,
-    )
+
+    // 等不到响应：显存溢出后模型加载会挂死，进程还在、端口还占着，但永远不会自己恢复。
+    // 这种僵尸不清理的话，用户点多少次启动都绑不上端口，只能去任务管理器里翻。
+    let cleared = false
+    const stuckPid = await findPidByPort(port)
+    if (stuckPid !== null) {
+      const stuckName = await getProcessName(stuckPid)
+      if (stuckName !== '' && stuckName.includes('python') && await killProcess(stuckPid)) {
+        for (let i = 0; i < 20; i += 1) {
+          await sleep(500)
+          if (!(await isPortOpen(port, 800))) { cleared = true; break }
+        }
+      }
+    }
+    if (!cleared) {
+      throw new Error(
+        `端口 ${port} 有程序在监听，但 ${Math.round(waitMs / 1000)} 秒内一直没有响应 ComfyUI 的接口。`
+        + ` 可能的情况：① ComfyUI 还在加载（稍后直接重试出图即可）`
+        + ` ② 端口被别的程序占用 ③ ComfyUI 卡死且无法自动清理。`
+        + ` 排查占用者：netstat -ano | findstr :${port}。`
+        + ` 确认后要么结束占用进程，要么在设置里把 ComfyUI 地址改到别的端口。`,
+      )
+    }
   }
 
   if (!launching) {
@@ -2404,17 +2420,49 @@ async function generateImageUnlocked(args, exec) {
     }
     const cfg = currentConfig()
     const baseUrl = String(cfg.comfyUrl ?? DEFAULTS.comfyUrl).replace(/\/+$/u, '')
-    const health = await checkComfy(baseUrl)
-    if (!health.online) {
-      respondJson(res, 200, { ok: true, already: true })
-      return
-    }
     const port = Number(comfyPort(baseUrl))
     if (!Number.isFinite(port) || port <= 0) {
       respondJson(res, 200, { ok: false, error: '无法从 comfyUrl 解析出端口' })
       return
     }
+
+    const health = await checkComfy(baseUrl)
     const pid = await findPidByPort(port)
+
+    // HTTP 不通不等于「没在跑」：显存溢出后模型加载会挂住，进程还在、端口还占着，
+    // 但所有接口都超时。这时如果直接回「已经停了」，用户点多少次都起不来新的——
+    // 必须把这个僵尸进程清掉，端口腾出来，下一次启动才能绑上去。
+    if (!health.online) {
+      if (pid === null) {
+        respondJson(res, 200, { ok: true, already: true })
+        return
+      }
+      const stuckName = await getProcessName(pid)
+      if (stuckName === '' || !stuckName.includes('python')) {
+        respondJson(res, 200, {
+          ok: false,
+          error: stuckName === ''
+            ? `端口 ${port} 被一个无法识别的进程（pid ${pid}）占用，为安全起见已拒绝终止`
+            : `端口 ${port} 被 ${stuckName}（pid ${pid}）占用，不是 ComfyUI，已拒绝终止`,
+        })
+        return
+      }
+      const killedStuck = await killProcess(pid)
+      if (!killedStuck) {
+        respondJson(res, 200, { ok: false, error: `终止卡死的 pid ${pid} 失败，可能需要管理员权限` })
+        return
+      }
+      for (let i = 0; i < 20; i += 1) {
+        await sleep(500)
+        if (!(await isPortOpen(port, 800))) {
+          respondJson(res, 200, { ok: true, pid, killedStuck: true })
+          return
+        }
+      }
+      respondJson(res, 200, { ok: false, error: `已请求终止 pid ${pid}，但端口 ${port} 仍被占用` })
+      return
+    }
+
     if (pid === null) {
       respondJson(res, 200, { ok: false, error: `找不到监听 ${port} 端口的进程` })
       return
