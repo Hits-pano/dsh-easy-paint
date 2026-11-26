@@ -198,6 +198,7 @@ window.__ModuleLoader__.load({
       seatOffline: 'ComfyUI 离线',
       seatUnknown: '检测中…',
       seatTitleStop: '点击终止 ComfyUI，释放显存和端口',
+      seatTitleLaunch: '点击启动 ComfyUI（端口被占时会先清掉卡死的进程）',
       seatConfirmStop: '再点一次终止',
       seatZombie: '端口被占用·点击处理',
       seatChecking: '自检中…',
@@ -376,6 +377,7 @@ window.__ModuleLoader__.load({
       seatOffline: 'ComfyUI offline',
       seatUnknown: 'Checking…',
       seatTitleStop: 'Click to stop ComfyUI and free VRAM and the port',
+      seatTitleLaunch: 'Click to launch ComfyUI (a hung process holding the port is cleared first)',
       seatConfirmStop: 'Click again to stop',
       seatZombie: 'Port taken - click to resolve',
       seatChecking: 'Checking…',
@@ -2459,7 +2461,7 @@ const SEAT_STYLE = `
     function ComfyStatusSeat(props) {
       const t = props.t
       const variant = props.variant === 'panel' ? 'panel' : 'seat'
-      const { state, meta, zombie, check, stop } = useComfyControl()
+      const { state, meta, zombie, check, launch, stop } = useComfyControl()
       // 终止的二次确认：点一次进入待确认，5 秒内再点才真的终止
       const [confirming, setConfirming] = React.useState(false)
       const confirmTimer = React.useRef(null)
@@ -2488,7 +2490,14 @@ const SEAT_STYLE = `
       // 其余情况（就绪、离线）都让位给「配置待优化」，否则用户根本注意不到。
       const paramIssues = Array.isArray(meta.paramIssues) ? meta.paramIssues : []
       const paramWarn = paramIssues.length > 0
-      if (confirming) {
+      // 离线（含僵尸态）：胶囊的作用是「启动」；在线/出图中才是「终止」
+      const offline = state === 'off' || state === 'unknown'
+      // 在线时点了一次确认、还没点第二次就掉线了：清掉待确认态，别让「再点一次终止」
+      // 停在离线胶囊上——那时候它该显示的是「点击启动」。
+      React.useEffect(() => {
+        if (offline) setConfirming(false)
+      }, [offline])
+      if (confirming && !offline) {
         label = t('seatConfirmStop')
       } else if (state === 'busy') {
         const p = meta.progress
@@ -2531,11 +2540,12 @@ const SEAT_STYLE = `
       const fillActive = fillPercent !== null
       const fillStyle = fillActive ? { '--qwd-fill': `${fillPercent}%` } : undefined
 
-      // 不论在线、离线、出图中还是僵尸态，胶囊只有一个动作：终止 ComfyUI 并释放端口。
-      // 所以标题也统一，不再按状态分叉。
-      const title = confirming
+      // 离线点胶囊 = 启动（含清僵尸）；在线/出图中 = 终止。标题跟着动作走。
+      const title = (confirming && !offline)
         ? t('seatConfirmStop')
-        : (meta.lastError === '' ? t('seatTitleStop') : `${t('seatTitleStop')}\n${meta.lastError}`)
+        : offline
+          ? (meta.lastError === '' ? t('seatTitleLaunch') : `${t('seatTitleLaunch')}\n${meta.lastError}`)
+          : (meta.lastError === '' ? t('seatTitleStop') : `${t('seatTitleStop')}\n${meta.lastError}`)
 
       // 终止：先确认一次，避免误点把正在用的 ComfyUI 关掉
       const stopComfy = async () => {
@@ -2545,13 +2555,19 @@ const SEAT_STYLE = `
       }
 
       /**
-       * 状态胶囊只有一件事：终止 ComfyUI 并释放端口。
+       * 离线（含僵尸态）点胶囊 = 启动 ComfyUI。
+       *   Host 会先探 15 秒判断是「正在启动」还是「卡死的僵尸」，是僵尸就清掉
+       *   再拉起，所以一次点击就能恢复。僵尸态不用二次确认——它本来就没在跑。
        *
-       * 不论当前在线、离线、出图中还是僵尸态，都是「点一次确认、再点一次执行」。
-       * Host 侧的 stop 已经能处理各种情况：在线就杀进程，离线但有卡死的进程
-       * 占着端口也会清掉。启动改由设置页顶部的控制条负责。
+       * 在线 / 出图中点胶囊 = 终止 ComfyUI。
+       *   第一次点进入待确认，5 秒内再点才执行，避免误点关掉正在跑的任务。
        */
       const handleClick = async () => {
+        if (offline) {
+          await launch(false)
+          void check()
+          return
+        }
         if (!confirming) {
           setConfirming(true)
           if (confirmTimer.current !== null) window.clearTimeout(confirmTimer.current)
@@ -2567,10 +2583,11 @@ const SEAT_STYLE = `
       // 设置里关掉了状态胶囊就整个不渲染（设置页顶部控制条仍可用）
       if (!seatEnabled) return null
 
-      const visualState = confirming ? 'stop-confirm' : (zombie ? 'zombie' : state)
+      const confirmingActive = confirming && !offline
+      const visualState = confirmingActive ? 'stop-confirm' : (zombie ? 'zombie' : state)
       // 配置待优化：整颗胶囊变黄。启动中/僵尸态/终止确认态不抢，其余一律标黄，
       // 包括离线——离线时更该知道这组参数有问题。
-      const showParamWarn = paramWarn && state !== 'starting' && !zombie && !confirming
+      const showParamWarn = paramWarn && state !== 'starting' && !zombie && !confirmingActive
       const className = `qwd-seat qwd-seat-${visualState}`
         + (variant === 'panel' ? ' qwd-seat-panel' : '')
         + (fillActive ? ' qwd-seat-fill' : '')
@@ -2588,7 +2605,7 @@ const SEAT_STYLE = `
         onClick: () => { void handleClick() },
       },
       h('style', null, SEAT_STYLE),
-      confirming ? h('span', null, t('seatConfirmStop')) : body,
+      confirmingActive ? h('span', null, t('seatConfirmStop')) : body,
       extra,
       )
     }
