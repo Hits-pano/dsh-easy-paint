@@ -2306,8 +2306,17 @@ async function generateImageUnlocked(args, exec) {
     const baseUrl = String(cfg.comfyUrl ?? DEFAULTS.comfyUrl).replace(/\/+$/u, '')
 
     if (launching) {
-      respondJson(res, 200, { ok: true, already: true, note: '正在启动中' })
-      return
+      // 「正在启动」这个标志可能是上一次启动失败后没复位留下的。
+      // 判断依据：真在启动的话，端口早就该有人在监听了；端口空着却还挂着
+      // launching，说明那次启动其实已经死了——自愈后继续，不让用户干等 240 秒。
+      const alivePort = Number(comfyPort(baseUrl))
+      const portListening = Number.isFinite(alivePort) && await isPortOpen(alivePort)
+      if (portListening) {
+        respondJson(res, 200, { ok: true, already: true, note: '正在启动中' })
+        return
+      }
+      launching = false
+      lastStartError = ''
     }
     if (cfg.autoStart === false) {
       respondJson(res, 200, { ok: false, error: '自动启动已在设置里关闭，先打开那个开关' })
@@ -2340,53 +2349,44 @@ async function generateImageUnlocked(args, exec) {
     const occupied = Number.isFinite(port) && await isPortOpen(port)
 
     if (occupied) {
-      // 端口有人：先给它一点时间（可能是用户刚手动启动、还在加载）
-      if (!force) {
-        const probeWaitMs = 15000
-        const probeDeadline = Date.now() + probeWaitMs
-        while (Date.now() < probeDeadline) {
-          await sleep(2000)
-          const h = await checkComfy(baseUrl)
-          if (h.online) {
-            respondJson(res, 200, { ok: true, already: true, version: h.version })
-            return
-          }
+      // 端口有人：先给一点时间（可能是用户刚手动启动、模型还在加载）
+      const probeWaitMs = 15000
+      const probeDeadline = Date.now() + probeWaitMs
+      while (Date.now() < probeDeadline) {
+        await sleep(2000)
+        const h = await checkComfy(baseUrl)
+        if (h.online) {
+          respondJson(res, 200, { ok: true, already: true, version: h.version })
+          return
         }
-        // 等不到就不动手，如实报告「僵尸」，让前端提示用户可以强制重启
-        const pid = await findPidByPort(port)
-        const processName = pid === null ? '' : await getProcessName(pid)
-        respondJson(res, 200, {
-          ok: false,
-          zombie: true,
-          pid,
-          processName,
-          port,
-          error: `端口 ${port} 被占用，但 ${Math.round(probeWaitMs / 1000)} 秒内服务一直无响应——ComfyUI 可能卡死了。`
-            + (pid === null ? '' : `（占用进程：${processName || '未知'}，pid ${pid}）`)
-            + ' 再点一次将强制终止并重启。',
-        })
-        return
       }
 
-      // force：验进程名 → 强杀 → 等端口释放
+      // 15 秒还没响应：显存溢出后模型加载会挂死，进程还在、端口还占着但永远不恢复。
+      // 这里直接清掉重来——用户点一次启动就该恢复，不需要再点两次确认。
+      // 安全闸保留：只杀进程名含 python 的，别的一律拒绝并如实说明。
       const pid = await findPidByPort(port)
       if (pid === null) {
-        respondJson(res, 200, { ok: false, error: `找不到监听 ${port} 端口的进程` })
+        respondJson(res, 200, { ok: false, error: `端口 ${port} 被占用，但找不到占用进程` })
         return
       }
       const processName = await getProcessName(pid)
       if (processName === '' || !processName.includes('python')) {
         respondJson(res, 200, {
           ok: false,
+          zombie: true,
+          pid,
+          processName,
+          port,
           error: processName === ''
-            ? `无法确认 pid ${pid} 的进程名，为安全起见拒绝终止`
-            : `端口 ${port} 被 ${processName}（pid ${pid}）占用，不是 ComfyUI，拒绝终止`,
+            ? `端口 ${port} 被一个无法识别的进程（pid ${pid}）占用，为安全起见已拒绝终止。请手动结束它。`
+            : `端口 ${port} 被 ${processName}（pid ${pid}）占用，不是 ComfyUI，已拒绝终止。`
+              + ' 请手动结束后再启动，或在设置里把 ComfyUI 地址改到别的端口。',
         })
         return
       }
       const killed = await killProcess(pid)
       if (!killed) {
-        respondJson(res, 200, { ok: false, error: `终止 pid ${pid} 失败，可能需要管理员权限` })
+        respondJson(res, 200, { ok: false, error: `终止卡死的 pid ${pid} 失败，可能需要管理员权限` })
         return
       }
       for (let i = 0; i < 24; i += 1) {
