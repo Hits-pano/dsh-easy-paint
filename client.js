@@ -2274,7 +2274,10 @@ const PANEL_FIELDS = {
 
 const SEAT_STYLE = `
 .qwd-seat {
-  display: inline-flex; align-items: center; gap: 6px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  /* 固定最小宽度：待确认时文案会换，宽度一变胶囊就会左右抽动。
+     96px 能装下「终止进程？」这类短文案，切换时宽度保持不变。 */
+  min-width: 96px;
   height: 26px; padding: 0 9px; border-radius: 13px;
   font-size: 12px; line-height: 1; white-space: nowrap;
   color: var(--dsw-alias-text-secondary, #8b8f96);
@@ -2290,23 +2293,21 @@ const SEAT_STYLE = `
   width: 6px; height: 6px; border-radius: 50%; flex: none;
   background: var(--qwd-seat-dot, #9aa0a6);
 }
-/* 待确认态的叠字：容器宽度取「原标签」和「终止进程？」中的较宽者，
-   切换时胶囊宽度不变，避免周围元素被推来推去。
-   inline-grid 的行盒和普通 span 不同，不锁 line-height 会在 flex 里
-   垂直偏 1-2px，所以两处都钉死行高并居中。 */
+/* 待确认态：原标签继续占位（隐身），「终止进程？」绝对定位盖在它正中间。
+   绝对定位不参与布局，所以既不撑宽也不改变行高；配合胶囊的 min-width，
+   切换时宽高都不动。 */
 .qwd-seat-stack {
-  display: inline-grid;
-  align-items: center;
-  line-height: 1;
-  vertical-align: middle;
-}
-.qwd-seat-stack > * {
-  grid-area: 1 / 1;
-  line-height: 1;
-  align-self: center;
+  position: relative;
+  display: inline-block;
 }
 .qwd-seat-stack-keep { visibility: hidden; }
-.qwd-seat-stack-over { white-space: nowrap; }
+.qwd-seat-stack-over {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+}
 /* 设置页用的放大变体 */
 .qwd-seat-panel { height: 32px; padding: 0 14px; border-radius: 16px; font-size: 13px; gap: 8px; }
 .qwd-seat-meta { font-size: 11px; opacity: .7; }
