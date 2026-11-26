@@ -457,7 +457,8 @@ window.__ModuleLoader__.load({
 
 .qwd-savebar {
   display: flex; align-items: center; gap: 10px;
-  margin: 16px 0 10px;
+  /* 上边距和各设置项之间保持一致（10px）；和上一项的 10px 会合并，结果仍是 10px */
+  margin: 10px 0 10px;
 }
 .qwd-save-btn {
   height: 30px; padding: 0 16px; border-radius: 7px;
