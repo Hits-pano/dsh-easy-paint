@@ -41,7 +41,7 @@ window.__ModuleLoader__.load({
       modelsDir: '模型文件路径',
       modelsDirHint: '填 models 目录本身，留空则用「工作目录/models」。填了可以不启动 ComfyUI 直接读模型列表。',
       comfyWorkdirHint: '留空则用 main.py 所在目录。',
-      seatStarting: '启动中…',
+      seatStarting: 'ComfyUI 启动中',
       archLabel: '模型架构',
       archHint: '决定用哪套 ComfyUI 工作流。换架构后要重新选模型，采样参数默认值也不同。',
       archQwen: 'Qwen-Image',
@@ -191,10 +191,10 @@ window.__ModuleLoader__.load({
       modelStale: 'ComfyUI 当前离线，下面是上次缓存的列表 —— 选好后照样会保存，出图时会自动启动。',
       reload: '刷新模型列表',
       reloading: '刷新中…',
-      seatOnline: '生图就绪',
+      seatOnline: 'ComfyUI 已在线',
       seatBusy: '出图中',
       seatPreparing: '准备中',
-      seatOffline: 'ComfyUI 离线',
+      seatOffline: 'ComfyUI 已离线',
       seatUnknown: '检测中…',
       seatTitleStop: '点击终止 ComfyUI，释放显存和端口',
       seatTitleLaunch: '点击启动 ComfyUI（端口被占时会先清掉卡死的进程）',
@@ -220,7 +220,7 @@ window.__ModuleLoader__.load({
       modelsDir: 'Model folder',
       modelsDirHint: 'Point at the models folder itself. Empty means <working dir>/models. When set, the model list is read straight from disk without ComfyUI running.',
       comfyWorkdirHint: 'Empty uses the main.py directory.',
-      seatStarting: 'Starting…',
+      seatStarting: 'ComfyUI starting',
       archLabel: 'Architecture',
       archHint: 'Decides which ComfyUI workflow is used. Switching architecture means re-picking models; sampling defaults differ too.',
       archQwen: 'Qwen-Image',
@@ -370,7 +370,7 @@ window.__ModuleLoader__.load({
       modelStale: 'ComfyUI is offline; this list is cached. Your choice still saves, and drawing will start ComfyUI.',
       reload: 'Refresh models',
       reloading: 'Refreshing…',
-      seatOnline: 'Image ready',
+      seatOnline: 'ComfyUI online',
       seatBusy: 'Drawing',
       seatPreparing: 'Preparing',
       seatOffline: 'ComfyUI offline',
@@ -2289,11 +2289,12 @@ const SEAT_STYLE = `
 }
 .qwd-seat-fill > * { position: relative; z-index: 1; }
 /* 状态色只在这里定义一次：灯用纯色，边框用同色半透明，两者不会脱节。
-   前五个状态只换灯；后四个状态连文字一起换色，边框和灯仍由变量统一。 */
-.qwd-seat-on { --qwd-seat-dot: #4ea36b; }
+   三个主状态（在线绿 / 启动中蓝 / 已离线红）灯和文字一起上色，一眼能读出
+   当前处于哪个阶段；出图中和检测中只换灯，文字保持中性。 */
+.qwd-seat-on { --qwd-seat-dot: #4ea36b; color: #4ea36b; }
 .qwd-seat-busy { --qwd-seat-dot: #d99a3c; }
-.qwd-seat-starting { --qwd-seat-dot: #4a7bd0; }
-.qwd-seat-off { --qwd-seat-dot: #cf6a5f; }
+.qwd-seat-starting { --qwd-seat-dot: #4a7bd0; color: #4a7bd0; }
+.qwd-seat-off { --qwd-seat-dot: #cf6a5f; color: #cf6a5f; }
 .qwd-seat-unknown { --qwd-seat-dot: #9aa0a6; }
 /* 待确认态：整块红底 + 白字，和「确定恢复」的确定态一致。
    灯也转白，边框跟灯走（边框颜色统一由 --qwd-seat-dot 派生）。 */
