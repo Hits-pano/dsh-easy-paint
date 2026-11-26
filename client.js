@@ -2226,9 +2226,11 @@ const SEAT_STYLE = `
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   /* 固定最小宽度：待确认时文案会换，宽度一变胶囊就会左右抽动。
      96px 能装下「终止进程？」这类短文案，切换时宽度保持不变。 */
-  min-width: 96px;
-  /* 圆角不是全圆头：和插件里的按钮（7px）、输入框（6px）保持同一套圆角，
-     全圆头（13px = 高度的一半）看着像药丸，和 DSH 的方正风格不搭 */
+  /* 固定宽度，按最长的「端口被占用 · 点击释放」量出来是 150px。
+     这样切换状态时胶囊不会忽宽忽窄，对话框右侧那块不会跟着抖。
+     出图中和准备中的文字长度会变（步数、秒数），单独给它 width: auto。 */
+  box-sizing: border-box;
+  width: 150px;
   height: 26px; padding: 0 9px; border-radius: 7px;
   font-size: 12px; line-height: 1; white-space: nowrap;
   color: var(--dsw-alias-text-secondary, #8b8f96);
@@ -2263,7 +2265,7 @@ const SEAT_STYLE = `
   white-space: nowrap;
 }
 /* 设置页用的放大变体 */
-.qwd-seat-panel { height: 32px; padding: 0 14px; border-radius: 9px; font-size: 13px; gap: 8px; }
+.qwd-seat-panel { width: auto; height: 32px; padding: 0 14px; border-radius: 9px; font-size: 13px; gap: 8px; }
 /* 填充模式：整颗胶囊从左往右被进度填满，内容压在填充层之上 */
 .qwd-seat-fill { position: relative; overflow: hidden; }
 .qwd-seat-fill::before {
@@ -2281,7 +2283,8 @@ const SEAT_STYLE = `
    否则「准备中 3s」「出图中 4/10」这种正在干活的胶囊会和灯色对不上。
    检测中（unknown）本来就是中性灰，文字也用同色，读起来更统一。 */
 .qwd-seat-on { --qwd-seat-dot: #4ea36b; color: #4ea36b; }
-.qwd-seat-busy { --qwd-seat-dot: #d99a3c; color: #d99a3c; }
+/* 出图中和准备中的文字带步数 / 秒数，长度会变，不固定宽度 */
+.qwd-seat-busy { --qwd-seat-dot: #d99a3c; color: #d99a3c; width: auto; }
 .qwd-seat-starting { --qwd-seat-dot: #4a7bd0; color: #4a7bd0; }
 .qwd-seat-off { --qwd-seat-dot: #cf6a5f; color: #cf6a5f; }
 .qwd-seat-unknown { --qwd-seat-dot: #9aa0a6; color: #9aa0a6; }
