@@ -499,6 +499,17 @@ window.__ModuleLoader__.load({
   color: #e0b054;
   background: rgba(224, 176, 84, .1);
 }
+/* 待确认态：整块黄底 + 深色字，和「确定恢复」的整块红底同一套观感。
+   放在 warn 后面并用更长的选择器，确保盖掉 warn / dirty 的浅色底。 */
+.qwd-save-armed,
+.qwd-save-armed.qwd-save-warn,
+.qwd-save-armed.qwd-save-dirty {
+  border-color: #e0b054;
+  background: rgba(224, 176, 84, .9);
+  color: #1b1b1b;
+  font-weight: 500;
+}
+.qwd-save-armed:hover:not(:disabled) { background: rgba(224, 176, 84, .98); border-color: #e0b054; }
 /* 最下方的预警清单：全部用黄色，不再区分严重程度 */
 .qwd-warn-list {
   display: flex; flex-direction: column; gap: 5px;
@@ -2165,7 +2176,9 @@ window.__ModuleLoader__.load({
             className: 'qwd-save-btn'
               + (dirtyFields.length > 0 ? ' qwd-save-dirty' : '')
               // 有预警（参数越界或模型不兼容）就转黄，点击会先确认一次
-              + ((hasIncompatible || hasParamWarn) ? ' qwd-save-warn' : ''),
+              + ((hasIncompatible || hasParamWarn) ? ' qwd-save-warn' : '')
+              // 待确认态：整块黄底，和「确定恢复」的整块红底对应
+              + (saveArmed ? ' qwd-save-armed' : ''),
             disabled: disabled || saving || dirtyFields.length === 0,
             onClick: requestSave,
           }, saving ? t('saving') : (saveArmed ? t('saveConfirm') : t('saveSettings'))),
@@ -2277,7 +2290,16 @@ const SEAT_STYLE = `
 .qwd-seat-starting { --qwd-seat-dot: #4a7bd0; }
 .qwd-seat-off { --qwd-seat-dot: #cf6a5f; }
 .qwd-seat-unknown { --qwd-seat-dot: #9aa0a6; }
-.qwd-seat-stop-confirm { --qwd-seat-dot: #e0867c; color: #e0867c; }
+/* 待确认态：整块红底 + 白字，和「确定恢复」的确定态一致。
+   灯也转白，边框跟灯走（边框颜色统一由 --qwd-seat-dot 派生）。 */
+.qwd-seat-stop-confirm {
+  --qwd-seat-dot: #ffffff;
+  background: rgba(224, 90, 80, .85);
+  border-color: rgba(224, 90, 80, .95);
+  color: #ffffff;
+}
+/* 出图中点胶囊时胶囊带进度填充层，待确认态要让位给整块红底 */
+.qwd-seat-stop-confirm::before { display: none; }
 .qwd-seat-zombie { --qwd-seat-dot: #e0a05c; color: #e0a05c; }
 .qwd-seat-checking { --qwd-seat-dot: #8b6fd0; color: #a08fe0; }
 .qwd-seat-param-warn { --qwd-seat-dot: #e0b054; color: #e0b054; background: rgba(224, 176, 84, .1); }
