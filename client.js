@@ -403,13 +403,14 @@ window.__ModuleLoader__.load({
 }
 .qwd-reset-btn:hover:not(:disabled) { background-color: rgba(224, 90, 80, .1); }
 .qwd-reset-btn:disabled { opacity: .45; cursor: default; }
-/* 已就绪：整块变实心红，提示「再点一次」 */
+/* 待确认态：半透明暗红填充 + 亮红边框，提示「再点一次」 */
 .qwd-reset-armed {
   background: rgba(176, 82, 74, .45) !important;
   border-color: rgba(224, 90, 80, .95);
-  color: #fff;
+  color: #ffb8ad;
   font-weight: 500;
 }
+.qwd-reset-armed:hover:not(:disabled) { border-color: #f5867c; }
 
 /* LoRA 编辑区 */
 /* LoRA 行：标题+内联说明在左，下拉+权重在右，整行不折 */
@@ -509,12 +510,13 @@ window.__ModuleLoader__.load({
   /* 同上：半透明主色填充，边框用完全不透明的主色，边框比填充亮 */
   border-color: var(--dsw-alias-accent-primary, #6ba4ff);
   background: color-mix(in srgb, var(--dsw-alias-accent-primary, #6ba4ff) 48%, transparent);
-  color: #ffffff;
+  /* 文字用主色的亮版，不是纯白 */
+  color: color-mix(in srgb, var(--dsw-alias-accent-primary, #6ba4ff) 55%, #ffffff);
   font-weight: 500;
 }
 .qwd-save-armed:hover:not(:disabled) {
   background: color-mix(in srgb, var(--dsw-alias-accent-primary, #6ba4ff) 60%, transparent);
-  border-color: var(--dsw-alias-accent-primary, #6ba4ff);
+  border-color: color-mix(in srgb, var(--dsw-alias-accent-primary, #6ba4ff) 62%, #ffffff);
 }
 /* 最下方的预警清单：全部用黄色，不再区分严重程度 */
 .qwd-warn-list {
@@ -2301,13 +2303,19 @@ const SEAT_STYLE = `
 /* 待确认态：整块红底 + 白字，和「确定恢复」的确定态一致。
    灯也转白，边框跟灯走（边框颜色统一由 --qwd-seat-dot 派生）。 */
 .qwd-seat-stop-confirm {
-  --qwd-seat-dot: #ffffff;
+  /* 边框和灯的基色仍是红：hover 时边框由 --qwd-seat-dot 派生，
+     一旦设成白色，鼠标放上去就会变成白框。 */
+  --qwd-seat-dot: #e05a50;
   /* 半透明暗红填充：能透出胶囊原本的灰底，边框仍然清晰、
      而且边框比填充亮一档，整块看着像「描红填色」而不是实心块。 */
   background: rgba(176, 82, 74, .42);
   border-color: rgba(224, 90, 80, .95);
-  color: #ffffff;
+  /* 文字用状态红的亮版，不是纯白 */
+  color: #ffb8ad;
 }
+/* 胶囊的通用 hover 会把边框拉到 75% 透明度，对确认态来说反而更淡。
+   这里单独给一条更亮的，保持「鼠标放上去边框更明显」的一致手感。 */
+.qwd-seat-stop-confirm:hover { border-color: rgba(245, 132, 122, .98); }
 /* 出图中点胶囊时胶囊带进度填充层，待确认态要让位给整块红底 */
 .qwd-seat-stop-confirm::before { display: none; }
 .qwd-seat-zombie { --qwd-seat-dot: #e0a05c; color: #e0a05c; }
