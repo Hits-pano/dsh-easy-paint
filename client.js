@@ -2591,7 +2591,6 @@ const SEAT_STYLE = `
       },
       h('style', null, SEAT_STYLE),
       body,
-      extra,
       )
     }
 
