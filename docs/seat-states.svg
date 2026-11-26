@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="470" viewBox="0 0 560 470" role="img" aria-label="Easy Paint 状态胶囊的各个状态">
+  <title>Easy Paint 状态胶囊</title>
+  <desc>对话框右下角状态胶囊在不同状态下的外观：已在线、启动中、已离线、出图中、准备中、配置待优化、端口被占用、终止确认、检测中。</desc>
+
+  <rect width="560" height="470" rx="10" fill="#242424"/>
+
+  <g font-family="-apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif" font-size="13">
+
+    <!-- 1. 已在线（绿） -->
+    <g transform="translate(24 22)">
+      <rect width="240" height="32" rx="16" fill="#3a3a3a" stroke="#4ea36b" stroke-opacity="0.45"/>
+      <circle cx="17" cy="16" r="3" fill="#4ea36b"/>
+      <text x="28" y="21" fill="#4ea36b">ComfyUI 已在线</text>
+      <text x="252" y="21" fill="#6b6b6b" font-size="12">空闲，可以出图</text>
+    </g>
+
+    <!-- 2. 启动中（蓝） -->
+    <g transform="translate(24 66)">
+      <rect width="240" height="32" rx="16" fill="#3a3a3a" stroke="#4a7bd0" stroke-opacity="0.45"/>
+      <circle cx="17" cy="16" r="3" fill="#4a7bd0"/>
+      <text x="28" y="21" fill="#4a7bd0">ComfyUI 启动中</text>
+      <text x="252" y="21" fill="#6b6b6b" font-size="12">正在拉起 / 加载模型</text>
+    </g>
+
+    <!-- 3. 已离线（红） -->
+    <g transform="translate(24 110)">
+      <rect width="240" height="32" rx="16" fill="#3a3a3a" stroke="#cf6a5f" stroke-opacity="0.45"/>
+      <circle cx="17" cy="16" r="3" fill="#cf6a5f"/>
+      <text x="28" y="21" fill="#cf6a5f">ComfyUI 已离线</text>
+      <text x="252" y="21" fill="#6b6b6b" font-size="12">点一下即可启动</text>
+    </g>
+
+    <!-- 4. 出图中（橙，带进度填充 40%） -->
+    <g transform="translate(24 154)">
+      <rect width="240" height="32" rx="16" fill="#3a3a3a" stroke="#d99a3c" stroke-opacity="0.45"/>
+      <clipPath id="clipBusy"><rect width="240" height="32" rx="16"/></clipPath>
+      <g clip-path="url(#clipBusy)">
+        <rect width="96" height="32" fill="#d99a3c" fill-opacity="0.32"/>
+      </g>
+      <circle cx="17" cy="16" r="3" fill="#d99a3c"/>
+      <text x="28" y="21" fill="#d99a3c">Qwen 出图中 4/10</text>
+      <text x="252" y="21" fill="#6b6b6b" font-size="12">橙色条随步数填充</text>
+    </g>
+
+    <!-- 5. 准备中（橙） -->
+    <g transform="translate(24 198)">
+      <rect width="240" height="32" rx="16" fill="#3a3a3a" stroke="#d99a3c" stroke-opacity="0.45"/>
+      <circle cx="17" cy="16" r="3" fill="#d99a3c"/>
+      <text x="28" y="21" fill="#d99a3c">准备中 3s</text>
+      <text x="252" y="21" fill="#6b6b6b" font-size="12">已排队，还没出采样进度</text>
+    </g>
+
+    <!-- 6. 配置待优化（黄） -->
+    <g transform="translate(24 242)">
+      <rect width="240" height="32" rx="16" fill="#e0b054" fill-opacity="0.1" stroke="#e0b054" stroke-opacity="0.45"/>
+      <circle cx="17" cy="16" r="3" fill="#e0b054"/>
+      <text x="28" y="21" fill="#e0b054">配置待优化</text>
+      <text x="252" y="21" fill="#6b6b6b" font-size="12">参数和模型不匹配</text>
+    </g>
+
+    <!-- 7. 端口被占用（僵尸态，橙） -->
+    <g transform="translate(24 286)">
+      <rect width="240" height="32" rx="16" fill="#3a3a3a" stroke="#e0a05c" stroke-opacity="0.45"/>
+      <circle cx="17" cy="16" r="3" fill="#e0a05c"/>
+      <text x="28" y="21" fill="#e0a05c">端口被占用·点击处理</text>
+      <text x="252" y="21" fill="#6b6b6b" font-size="12">不是 ComfyUI 占着端口</text>
+    </g>
+
+    <!-- 8. 终止确认（暗红半透明填充 + 亮红边框） -->
+    <g transform="translate(24 330)">
+      <rect width="240" height="32" rx="16" fill="#b0524a" fill-opacity="0.42" stroke="#e05a50" stroke-opacity="0.95"/>
+      <circle cx="17" cy="16" r="3" fill="#e05a50"/>
+      <text x="28" y="21" fill="#ffb8ad">终止进程？</text>
+      <text x="252" y="21" fill="#6b6b6b" font-size="12">再点一次才执行</text>
+    </g>
+
+    <!-- 9. 检测中（灰） -->
+    <g transform="translate(24 374)">
+      <rect width="240" height="32" rx="16" fill="#3a3a3a" stroke="#9aa0a6" stroke-opacity="0.45"/>
+      <circle cx="17" cy="16" r="3" fill="#9aa0a6"/>
+      <text x="28" y="21" fill="#9aa0a6">检测中…</text>
+      <text x="252" y="21" fill="#6b6b6b" font-size="12">刚打开，正在探活</text>
+    </g>
+
+    <!-- 说明 -->
+    <text x="24" y="440" fill="#6b6b6b" font-size="12">灯色、文字色、边框色始终同源；离线态点一下启动，其余状态点两次终止。</text>
+  </g>
+</svg>
