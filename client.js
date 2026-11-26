@@ -2274,8 +2274,8 @@ const SEAT_STYLE = `
   content: '';
   position: absolute; left: 0; top: 0; bottom: 0;
   width: var(--qwd-fill, 0%);
-  /* 和「出图中」的状态色 #d99a3c 同系，半透明铺底 */
-  background: rgba(217, 154, 60, .32);
+  /* 和「出图中」的状态色 #e0b054 同系，半透明铺底 */
+  background: rgba(224, 176, 84, .32);
   transition: width 450ms cubic-bezier(.22, 1, .36, 1);
   pointer-events: none;
 }
@@ -2285,7 +2285,7 @@ const SEAT_STYLE = `
    否则「准备中 3s」「出图中 4/10」这种正在干活的胶囊会和灯色对不上。
    检测中（unknown）本来就是中性灰，文字也用同色，读起来更统一。 */
 .qwd-seat-on { --qwd-seat-dot: #4ea36b; color: #4ea36b; }
-.qwd-seat-busy { --qwd-seat-dot: #d99a3c; color: #d99a3c; }
+.qwd-seat-busy { --qwd-seat-dot: #e0b054; color: #e0b054; }
 .qwd-seat-starting { --qwd-seat-dot: #4a7bd0; color: #4a7bd0; }
 .qwd-seat-off { --qwd-seat-dot: #cf6a5f; color: #cf6a5f; }
 .qwd-seat-unknown { --qwd-seat-dot: #9aa0a6; color: #9aa0a6; }
@@ -2307,8 +2307,9 @@ const SEAT_STYLE = `
 .qwd-seat-stop-confirm:hover { border-color: rgba(245, 132, 122, .98); }
 /* 出图中点胶囊时胶囊带进度填充层，待确认态要让位给整块红底 */
 .qwd-seat-stop-confirm::before { display: none; }
-/* 端口被占用归到「需要留意」这一档，和「配置待优化」同色。
-   胶囊的黄系现在只有两档：#d99a3c 橙 = 正在干活，#e0b054 黄 = 需要留意。 */
+/* 全插件的警告色只有一种：#e0b054。
+   配置待优化、端口被占用、出图中、准备中，以及设置页里所有预警文字，
+   用的是同一个黄；出图的进度填充也取它的半透明版。 */
 .qwd-seat-zombie { --qwd-seat-dot: #e0b054; color: #e0b054; }
 .qwd-seat-checking { --qwd-seat-dot: #8b6fd0; color: #a08fe0; }
 /* 「配置待优化」不再单独铺黄色底：胶囊里唯一该有填充的是出图进度条，
