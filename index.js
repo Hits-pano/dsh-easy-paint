@@ -1477,6 +1477,15 @@ function killProcess(pid) {
 }
 
 /** 用配置里的 python + main.py 把 ComfyUI 拉起来，输出写进日志文件而不是终端。 */
+/**
+ * 最近一次由本插件拉起的 ComfyUI 进程。
+ *
+ * 为什么要记：ComfyUI 刚启动时还在加载，端口往往还没绑上，这时候
+ * findPidByPort 什么都找不到，用户点「终止」只能得到「已经停了」的答复，
+ * 而进程其实还在慢慢起来。留着这个句柄就能直接杀掉它。
+ */
+let launchChild = null
+
 async function launchComfy(cfg) {
   const python = String(cfg.comfyPython ?? '').trim()
   const mainPy = String(cfg.comfyMainPy ?? '').trim()
@@ -1499,7 +1508,11 @@ async function launchComfy(cfg) {
     stdio: ['ignore', out, out], // 日志落文件，不占用终端
     detached: false,
   })
-  child.on('error', (error) => { lastStartError = error?.message ?? String(error) })
+  launchChild = child
+  // 进程退出或启动失败时清掉句柄，避免 onStop 拿到一个已经结束的进程
+  const forget = () => { if (launchChild === child) launchChild = null }
+  child.on('exit', forget)
+  child.on('error', (error) => { lastStartError = error?.message ?? String(error); forget() })
   return child
 }
 
@@ -2428,6 +2441,24 @@ async function generateImageUnlocked(args, exec) {
     const port = Number(comfyPort(baseUrl))
     if (!Number.isFinite(port) || port <= 0) {
       respondJson(res, 200, { ok: false, error: '无法从 comfyUrl 解析出端口' })
+      return
+    }
+
+    // 启动中的 ComfyUI 还没绑端口，靠端口找不到人。直接杀我们自己的句柄最准，
+    // 否则用户点「终止」只会得到「已经停了」，而进程其实还在慢慢起来。
+    if (launchChild !== null && launchChild.exitCode === null && launchChild.killed !== true) {
+      const childPid = launchChild.pid
+      try {
+        launchChild.kill()
+      } catch (error) {
+        respondJson(res, 200, { ok: false, error: `终止启动中的进程失败：${error?.message ?? error}` })
+        return
+      }
+      for (let i = 0; i < 20; i += 1) {
+        await sleep(500)
+        if (launchChild === null) break
+      }
+      respondJson(res, 200, { ok: true, pid: childPid, killedLaunching: true })
       return
     }
 
