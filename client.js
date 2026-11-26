@@ -528,7 +528,9 @@ window.__ModuleLoader__.load({
 .qwd-lead { margin: 0 0 20px; font-size: 13px; line-height: 1.7; color: var(--dsw-alias-text-secondary, #8b8f96); }
 .qwd-conn {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  margin: 0 0 24px; padding: 12px 14px; border-radius: 9px;
+  /* 和下面第一个设置项（.qwd-fold）之间留 16px：两块都是带边框的卡片，
+     贴死会分不清谁是谁；但也不需要原来 24px 那么远，那样显得疏离。 */
+  margin: 0 0 16px; padding: 12px 14px; border-radius: 9px;
   background: rgba(128, 128, 128, .09);
   border: 1px solid rgba(128, 128, 128, .18);
 }
