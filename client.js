@@ -536,14 +536,19 @@ window.__ModuleLoader__.load({
 .qwd-bar {
   display: flex; align-items: center; gap: 10px; width: 100%;
 }
+/* 标题和版本地址上下堆叠，左边不再拆成两列 */
+.qwd-bar-info {
+  display: flex; flex-direction: column; gap: 1px;
+  min-width: 0; flex: 1 1 auto;
+}
 .qwd-bar-title {
   /* 和设置项标题（.qwd-fold-title）保持同一套字号和字重 */
-  flex: none; font-size: 14px; font-weight: 600;
+  font-size: 14px; font-weight: 600;
   color: var(--dsw-alias-text-primary, #ededed);
 }
 .qwd-bar-meta {
   font-size: 11px; color: var(--dsw-alias-text-secondary, #8b8f96);
-  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 /* 胶囊推到最右，宽度不参与 meta 的伸缩 */
 .qwd-bar > .qwd-seat { margin-left: auto; flex: none; }
@@ -2602,10 +2607,12 @@ const SEAT_STYLE = `
       const metaText = meta.version !== '' ? `v${meta.version} · ${meta.endpoint}` : meta.endpoint
 
       return h('div', { className: 'qwd-bar' },
-        h('span', { className: 'qwd-bar-title' }, t('barTitle')),
-        meta.endpoint !== ''
-          ? h('span', { className: 'qwd-bar-meta', title: meta.endpoint }, metaText)
-          : null,
+        h('div', { className: 'qwd-bar-info' },
+          h('div', { className: 'qwd-bar-title' }, t('barTitle')),
+          meta.endpoint !== ''
+            ? h('div', { className: 'qwd-bar-meta', title: meta.endpoint }, metaText)
+            : null,
+        ),
         h(ComfyStatusSeat, { t, variant: 'panel' }),
       )
     }
