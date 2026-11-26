@@ -379,7 +379,7 @@ window.__ModuleLoader__.load({
   height: 30px; padding: 0 16px; border-radius: 7px;
   /* 和「保存设置」同宽：「恢复默认」和「确定恢复」都是 4 字，切换时不会跳 */
   min-width: 96px; text-align: center;
-  border: 1px solid rgba(224, 90, 80, .65);
+  border: 1.5px solid rgba(224, 90, 80, .65);
   color: #e05a50;
   font-size: 12px; cursor: pointer;
   background: transparent;
@@ -464,7 +464,7 @@ window.__ModuleLoader__.load({
   height: 30px; padding: 0 16px; border-radius: 7px;
   /* 固定最小宽度：文字在「保存设置」和「确认保存？」之间切换时长度不变 */
   min-width: 96px; text-align: center;
-  border: 1px solid rgba(237, 237, 237, .55);
+  border: 1.5px solid rgba(237, 237, 237, .55);
   background: transparent;
   color: var(--dsw-alias-text-primary, #ededed);
   font-size: 12px; cursor: pointer;
@@ -566,7 +566,7 @@ window.__ModuleLoader__.load({
 .qwd-mini {
   padding: 3px 9px; font: inherit; font-size: 11px; cursor: pointer;
   color: var(--dsw-alias-text-secondary, #8b8f96);
-  background: transparent; border: 1px solid rgba(128, 128, 128, .28); border-radius: 5px;
+  background: transparent; border: 1.5px solid rgba(128, 128, 128, .28); border-radius: 5px;
 }
 .qwd-mini:hover { color: var(--dsw-alias-text-primary, #ededed); border-color: var(--dsw-alias-accent, #4a7bd0); }
 .qwd-mini:disabled { opacity: .45; cursor: default; }
@@ -779,7 +779,7 @@ window.__ModuleLoader__.load({
   width: 100%; padding: 8px 10px; font: inherit; font-size: 12px; text-align: left;
   color: var(--dsw-alias-text-primary, #ededed); cursor: pointer;
   background: rgba(128, 128, 128, .08);
-  border: 1px solid rgba(128, 128, 128, .22); border-radius: 7px;
+  border: 1.5px solid rgba(128, 128, 128, .22); border-radius: 7px;
 }
 .qwd-candidate:hover { border-color: var(--dsw-alias-accent, #4a7bd0); }
 .qwd-candidate-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2235,7 +2235,7 @@ const SEAT_STYLE = `
   background: rgba(128, 128, 128, .10);
   /* 边框取自 --qwd-seat-dot：灯是什么颜色，边框就是同色的半透明版。
      不支持 color-mix 的内核会保留上一行的灰边框。 */
-  border: 1px solid rgba(128, 128, 128, .18);
+  border: 1.5px solid rgba(128, 128, 128, .18);
   border-color: color-mix(in srgb, var(--qwd-seat-dot, #808080) 45%, transparent);
   cursor: pointer; user-select: none;
 }
