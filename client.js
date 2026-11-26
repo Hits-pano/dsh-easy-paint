@@ -197,17 +197,11 @@ window.__ModuleLoader__.load({
       seatPreparing: '准备中',
       seatOffline: 'ComfyUI 离线',
       seatUnknown: '检测中…',
-      seatTitle: '本地 ComfyUI 状态，点击重新检测',
-      seatTitleLaunch: '点击启动 ComfyUI',
-      seatTitleStop: '点击终止 ComfyUI，释放显存',
+      seatTitleStop: '点击终止 ComfyUI，释放显存和端口',
       seatConfirmStop: '再点一次终止',
       seatZombie: '端口被占用·点击处理',
       seatChecking: '自检中…',
       seatParamWarn: '配置待优化',
-      seatParamHintLabel: '无视预警',
-      seatParamHint: '参数和当前模型不匹配，可以在设置页调整；再点一次将忽略此提示，照常出图。',
-      seatForceConfirm: '再点一次强制重启',
-      seatTitleZombie: 'ComfyUI 进程卡死（端口被占用但服务无响应），点击强制终止并重启',
     }
     const en = {
       title: 'Easy Paint',
@@ -381,17 +375,11 @@ window.__ModuleLoader__.load({
       seatPreparing: 'Preparing',
       seatOffline: 'ComfyUI offline',
       seatUnknown: 'Checking…',
-      seatTitle: 'Local ComfyUI status. Click to recheck.',
-      seatTitleLaunch: 'Click to start ComfyUI',
-      seatTitleStop: 'Click to stop ComfyUI and free VRAM',
+      seatTitleStop: 'Click to stop ComfyUI and free VRAM and the port',
       seatConfirmStop: 'Click again to stop',
       seatZombie: 'Port taken - click to resolve',
       seatChecking: 'Checking…',
       seatParamWarn: 'Config needs tuning',
-      seatParamHintLabel: 'Ignore warning',
-      seatParamHint: 'Parameters do not match the selected model. You can adjust them in Settings; click again to ignore this warning and generate anyway.',
-      seatForceConfirm: 'Click again to force restart',
-      seatTitleZombie: 'ComfyUI is hung (port held, service unresponsive). Click to force restart.',
     }
 
     const STYLE = `
@@ -2471,27 +2459,13 @@ const SEAT_STYLE = `
     function ComfyStatusSeat(props) {
       const t = props.t
       const variant = props.variant === 'panel' ? 'panel' : 'seat'
-      const { state, meta, zombie, check, launch, stop } = useComfyControl()
-      // 终止 / 强制重启的二次确认：点一次进入待确认，3 秒内再点才真执行
+      const { state, meta, zombie, check, stop } = useComfyControl()
+      // 终止的二次确认：点一次进入待确认，5 秒内再点才真的终止
       const [confirming, setConfirming] = React.useState(false)
-      const [forceArmed, setForceArmed] = React.useState(false)
       const confirmTimer = React.useRef(null)
-      // 「配置待优化」的三态：
-      //   初始           → 显示「配置待优化」（黄）
-      //   第一次点击     → 显示「无视预警」（确认步骤）
-      //   第二次点击     → 用户确认无视，胶囊恢复正常外观，可以照常出图
-      const [paramHint, setParamHint] = React.useState(false)
-      const [paramDismissed, setParamDismissed] = React.useState(false)
       // 是否显示状态胶囊由「外观设置 → 对话框显示 ComfyUI 状态」决定
       const [seatEnabled, setSeatEnabled] = React.useState(true)
 
-      // 预警内容一变（新问题出现、或旧的改好了），就重置「已无视」状态，
-      // 让用户重新看到提示。内容不变时保持无视，不会反复打扰。
-      const paramIssueKey = (Array.isArray(meta.paramIssues) ? meta.paramIssues : []).join(',')
-      React.useEffect(() => {
-        setParamDismissed(false)
-        setParamHint(false)
-      }, [paramIssueKey])
       React.useEffect(() => {
         let alive = true
         fetch(API_CONFIG, { cache: 'no-store' })
@@ -2514,9 +2488,9 @@ const SEAT_STYLE = `
       // 其余情况（就绪、离线）都让位给「配置待优化」，否则用户根本注意不到。
       const paramIssues = Array.isArray(meta.paramIssues) ? meta.paramIssues : []
       const paramWarn = paramIssues.length > 0
-      // 用户确认「无视」之后就不再打扰，胶囊按正常状态显示
-      const paramActive = paramWarn && !paramDismissed
-      if (state === 'busy') {
+      if (confirming) {
+        label = t('seatConfirmStop')
+      } else if (state === 'busy') {
         const p = meta.progress
         const hasSteps = p && typeof p.value === 'number' && typeof p.max === 'number' && p.max > 0
         if (hasSteps) {
@@ -2531,11 +2505,9 @@ const SEAT_STYLE = `
         } else {
           label = `${t('seatBusy')}…`
         }
-      } else if (zombie && forceArmed) {
-        label = t('seatForceConfirm')
-      } else if (zombie && state === 'off') {
+      } else if (zombie) {
         label = t('seatZombie')
-      } else if (paramActive && state !== 'starting') {
+      } else if (paramWarn && state !== 'starting') {
         // 配置该调了就提示，跟 ComfyUI 在不在线无关——
         // 离线时用户更需要知道「就算启动了，这组参数也出不好图」。
         // 只有「启动中」让位：那个过程是暂时的，且用户需要看到进度。
@@ -2553,31 +2525,17 @@ const SEAT_STYLE = `
         label = `${meta.archLabel} ${label}`
       }
 
-      // 第一次点击显示「无视预警」确认文案；第二次点击会清掉 paramHint 并置
-      // paramDismissed，标签随之回到正常状态（就绪 / 离线），表示用户选择无视
-      // 这条预警继续用。paramActive 为假（用户已无视，或配置已改好）时不生效。
-      if (paramHint && paramActive) label = t('seatParamHintLabel')
-
       const body = [h('span', { key: 'dot', className: 'qwd-seat-dot', 'aria-hidden': true }), h('span', { key: 'label' }, label)]
 
       // 填充模式：把进度百分比交给 CSS 变量，由 ::before 铺底色
       const fillActive = fillPercent !== null
       const fillStyle = fillActive ? { '--qwd-fill': `${fillPercent}%` } : undefined
 
-      const offline = state === 'off' || state === 'unknown'
-      const title = (paramHint && paramActive)
-        ? t('seatParamHint')
-        : confirming
+      // 不论在线、离线、出图中还是僵尸态，胶囊只有一个动作：终止 ComfyUI 并释放端口。
+      // 所以标题也统一，不再按状态分叉。
+      const title = confirming
         ? t('seatConfirmStop')
-        : forceArmed
-          ? t('seatForceConfirm')
-          : zombie
-            ? (meta.lastError === '' ? t('seatTitleZombie') : `${t('seatTitleZombie')}\n${meta.lastError}`)
-            : offline
-              ? (meta.lastError === '' ? t('seatTitleLaunch') : `${t('seatTitleLaunch')}\n${meta.lastError}`)
-              : state === 'on'
-                ? (meta.lastError === '' ? t('seatTitleStop') : `${t('seatTitleStop')}\n${meta.lastError}`)
-                : t('seatTitle')
+        : (meta.lastError === '' ? t('seatTitleStop') : `${t('seatTitleStop')}\n${meta.lastError}`)
 
       // 终止：先确认一次，避免误点把正在用的 ComfyUI 关掉
       const stopComfy = async () => {
@@ -2586,65 +2544,24 @@ const SEAT_STYLE = `
         void check()
       }
 
-      // 离线时点击 = 拉起 ComfyUI。若 Host 报回「僵尸」，则切成需要二次确认的强制重启。
+      /**
+       * 状态胶囊只有一件事：终止 ComfyUI 并释放端口。
+       *
+       * 不论当前在线、离线、出图中还是僵尸态，都是「点一次确认、再点一次执行」。
+       * Host 侧的 stop 已经能处理各种情况：在线就杀进程，离线但有卡死的进程
+       * 占着端口也会清掉。启动改由设置页顶部的控制条负责。
+       */
       const handleClick = async () => {
-        // 配置待优化：点状态座在「配置待优化」和「无视预警」之间切换，
-        // 不启动 ComfyUI（离线时尤其容易误触：看到黄灯想看看怎么回事，
-        // 结果把 ComfyUI 拉起来了）。三态：待优化 → 无视预警 → 恢复正常。
-        if (paramActive && !zombie && state !== 'busy' && state !== 'starting') {
-          if (!paramHint) {
-            // 第一次点击：先显示「无视预警」，让用户知道再点一次才真的无视
-            setParamHint(true)
-          } else {
-            // 第二次点击：确认无视，胶囊恢复正常外观，之后可以照常出图
-            setParamHint(false)
-            setParamDismissed(true)
-          }
+        if (!confirming) {
+          setConfirming(true)
+          if (confirmTimer.current !== null) window.clearTimeout(confirmTimer.current)
+          confirmTimer.current = window.setTimeout(() => {
+            setConfirming(false)
+            confirmTimer.current = null
+          }, 5000)
           return
         }
-        // 就绪：两次点击才真的终止
-        if (state === 'on') {
-          if (!confirming) {
-            setConfirming(true)
-            if (confirmTimer.current !== null) window.clearTimeout(confirmTimer.current)
-            confirmTimer.current = window.setTimeout(() => {
-              setConfirming(false)
-              confirmTimer.current = null
-            }, 3000)
-            return
-          }
-          await stopComfy()
-          return
-        }
-        if (state === 'starting' || state === 'busy') {
-          void check()
-          return
-        }
-        if (!offline) {
-          void check()
-          return
-        }
-
-        // —— 已知是僵尸：两次点击才强杀（杀进程有风险，不能一点就动）——
-        if (zombie) {
-          if (!forceArmed) {
-            setForceArmed(true)
-            if (confirmTimer.current !== null) window.clearTimeout(confirmTimer.current)
-            confirmTimer.current = window.setTimeout(() => {
-              setForceArmed(false)
-              confirmTimer.current = null
-            }, 4000)
-            return
-          }
-          setForceArmed(false)
-          await launch(true)
-          void check()
-          return
-        }
-
-        // —— 普通拉起（Host 会先探 15 秒，判断是「正在启动」还是「僵尸」）——
-        await launch(false)
-        void check()
+        await stopComfy()
       }
 
       // 设置里关掉了状态胶囊就整个不渲染（设置页顶部控制条仍可用）
@@ -2653,7 +2570,7 @@ const SEAT_STYLE = `
       const visualState = confirming ? 'stop-confirm' : (zombie ? 'zombie' : state)
       // 配置待优化：整颗胶囊变黄。启动中/僵尸态/终止确认态不抢，其余一律标黄，
       // 包括离线——离线时更该知道这组参数有问题。
-      const showParamWarn = paramActive && state !== 'starting' && !zombie && !confirming
+      const showParamWarn = paramWarn && state !== 'starting' && !zombie && !confirming
       const className = `qwd-seat qwd-seat-${visualState}`
         + (variant === 'panel' ? ' qwd-seat-panel' : '')
         + (fillActive ? ' qwd-seat-fill' : '')
