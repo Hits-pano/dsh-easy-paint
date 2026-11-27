@@ -498,6 +498,23 @@ window.__ModuleLoader__.load({
 .qwd-machine-v { color: var(--dsw-alias-text-primary, #ededed); }
 .qwd-machine-sep { color: rgba(128, 128, 128, .4); }
 
+/* 弹层渐显渐隐：遮罩淡入 + 卡片轻微上浮，关闭时反向播一遍再卸载 */
+@keyframes qwd-picker-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes qwd-picker-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes qwd-picker-box-in {
+  from { opacity: 0; transform: translateY(8px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes qwd-picker-box-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(6px) scale(.99); }
+}
 .qwd-picker-mask {
   position: fixed;
   inset: 0;
@@ -692,6 +709,91 @@ window.__ModuleLoader__.load({
   color: #8bbcff;
 }
 /* 快速出图：提示词 + 参考图 + 出图按钮 + 结果缩略图（本面板不显示进度） */
+.qwd-quick { display: flex; flex-direction: column; gap: 10px; }
+.qwd-quick-prompt,
+.qwd-quick-refs {
+  width: 100%;
+  box-sizing: border-box;
+  /* 标签和输入框直接相邻，没有 .qwd-field 的 gap 撑开，靠这里留出间距 */
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  border: 1px solid rgba(128, 128, 128, .22);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+}
+.qwd-quick-prompt:focus,
+.qwd-quick-refs:focus {
+  outline: none;
+  border-color: var(--dsw-alias-accent-primary, #6ba4ff);
+}
+.qwd-quick-prompt:disabled,
+.qwd-quick-refs:disabled { opacity: .6; }
+.qwd-quick-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.qwd-quick-btn { min-width: 96px; flex: none; }
+.qwd-quick-error { font-size: 12px; line-height: 1.5; color: #e0867c; }
+.qwd-quick-result { display: flex; gap: 14px; align-items: flex-start; }
+/* 缩略图容器：给右上角的叉号当定位基准 */
+.qwd-quick-thumb-wrap {
+  position: relative;
+  flex: none;
+  width: 120px;
+  height: 120px;
+}
+.qwd-quick-thumb {
+  display: block;
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 7px;
+  border: 1px solid rgba(128, 128, 128, .2);
+  background: rgba(128, 128, 128, .06);
+  cursor: pointer;
+  transition: border-color .15s ease, filter .15s ease;
+}
+.qwd-quick-thumb:hover { border-color: rgba(107, 164, 255, .75); filter: brightness(1.08); }
+/* 手动关掉预览的小叉号：方形，点一下只清界面，不动文件 */
+.qwd-quick-close {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: 1px solid rgba(128, 128, 128, .35);
+  background: var(--dsw-alias-bg-elevated, #2b2b2b);
+  color: #a8adb8;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color .15s ease, border-color .15s ease, background .15s ease;
+}
+.qwd-quick-close:hover {
+  border-color: rgba(207, 106, 95, .7);
+  background: rgba(207, 106, 95, .16);
+  color: #e07b6f;
+}
+.qwd-quick-meta { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.qwd-quick-done { font-size: 13px; font-weight: 500; color: #4ea36b; }
+.qwd-quick-path {
+  font-size: 11px;
+  color: #8b8f96;
+  word-break: break-all;
+}
 .qwd-savebar {
   display: flex; align-items: center; gap: 10px;
   /* 底部操作区和上面的设置项拉开距离，一眼能看出是两个层次。
