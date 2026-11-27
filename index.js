@@ -2009,10 +2009,9 @@ async function generateImageUnlocked(args, exec) {
 
   ctx.tools.register({
     name: 'draw_image',
-    description: '用本机 ComfyUI 生成一张图片，返回图片绝对路径与本次采样参数。当前支持的架构见设置页。'
-      + '返回里的 selfCheck 只是提示：ok 为 false 表示自检没通过，但图仍然有效。'
-      + '不要因为 selfCheck.ok 是 false 就自动重画——把 issues 转告用户，由用户决定要不要重出。'
-      + '重出次数由设置页的「重新出图次数」控制，工具本身不会自动重试。',
+    description: '用本机 ComfyUI 生成一张图片，返回图片绝对路径与本次采样参数。'
+      + '画幅、步数、CFG、负面词一律取设置页的值，不从这里传。'
+      + '出图失败不要自动重画，把错误告诉用户。',
     parameters: {
       prompt: {
         type: 'string',
@@ -2026,24 +2025,24 @@ async function generateImageUnlocked(args, exec) {
       images: {
         type: 'array',
         items: { type: 'string' },
-        description: '参考图路径数组（与 image 合并、去重）。默认最多 2 张——8 GB 显存下 3 张会把显存撑爆、任务卡死。',
+        description: '参考图路径数组（与 image 合并、去重）。默认最多 2 张，超出会被忽略。',
       },
       size: {
         type: 'string',
-        description: '已停用。画幅一律使用设置页的值，传了会被忽略。用户要求改画幅时，请让他到 DSH 设置 → Easy Paint 修改。',
+        description: '已停用，请改设置页。',
       },
       steps: {
         type: 'integer',
-        description: '已停用。采样步数一律使用设置页「生成默认值」里的值，传了会被忽略。用户要求改步数时，请让他到 DSH 设置 → Easy Paint 修改。',
+        description: '已停用，请改设置页。',
       },
       cfg: {
         type: 'number',
-        description: '已停用。CFG 一律使用设置页的值，传了会被忽略。用户要求改 CFG 时，请让他到 DSH 设置 → Easy Paint 修改。',
+        description: '已停用，请改设置页。',
       },
       seed: { type: 'integer', description: '随机种子。不填则随机——通常不要传。' },
       negative: {
         type: 'string',
-        description: '已停用。负面词一律使用设置页的值，传了会被忽略。用户要求改负面词时，请让他到 DSH 设置 → Easy Paint 修改。',
+        description: '已停用，请改设置页。',
       },
     },
     timeoutMs: 600000,
