@@ -13,11 +13,11 @@
  *   3. <home>/.dsh/easy-paint/config.json（设置页写入，改完立即生效，不用重启）
  */
 import { execFile, spawn } from 'node:child_process'
-import { existsSync, openSync } from 'node:fs'
-import { mkdir, readdir, readFile, writeFile, open } from 'node:fs/promises'
+import { existsSync, openSync, readdirSync } from 'node:fs'
+import { mkdir, readdir, readFile, writeFile, open, stat } from 'node:fs/promises'
 import net from 'node:net'
 import { homedir } from 'node:os'
-import { dirname, basename, join } from 'node:path'
+import { dirname, basename, join, resolve, relative } from 'node:path'
 
 export const name = 'easy-paint'
 export const inject = ['tools']
@@ -151,7 +151,11 @@ const LAUNCH_PATH = '/api/easy-paint/launch'
 const STOP_PATH = '/api/easy-paint/stop'
 const VISION_MODELS_PATH = '/api/easy-paint/vision-models'
 const DETECT_PATH = '/api/easy-paint/detect'
+const BROWSE_PATH = '/api/easy-paint/browse'
 const DRAW_PATH = '/api/easy-paint/draw'
+const IMAGE_PATH = '/api/easy-paint/image'
+const REVEAL_PATH = '/api/easy-paint/reveal'
+const OPEN_OUTPUT_PATH = '/api/easy-paint/open-output'
 const STATE_DIR = join(homedir(), '.dsh', 'easy-paint')
 const STATE_FILE = join(STATE_DIR, 'config.json')
 // 模型列表缓存：ComfyUI 关着时设置页仍然有下拉可选，不用逼用户手打文件名
@@ -490,6 +494,132 @@ async function detectInCustomRoot(root) {
   return { ...result, scannedRoots: 1, customRoot: target }
 }
 
+/**
+ * 在用户刚选中的目录里找 ComfyUI：先看自己是不是，再看直接子目录。
+ *
+ * 和 detectInCustomRoot 的区别：那个会往深里递归 5 层、要 30 秒；
+ * 这个只走两层，几毫秒就回来，适合「点一下目录立刻判断」。
+ * 用户手动指到 C:\Software\ComfyUI 这种上层目录时，也能一眼看出里面有没有。
+ */
+async function findComfyInDir(target) {
+  const root = String(target ?? '').trim().replace(/[/\\]+$/u, '')
+  if (root === '') return { candidates: [], checked: 0 }
+  const candidates = []
+  const collect = async (dir) => {
+    let entries
+    try { entries = await readdir(dir, { withFileTypes: true }) } catch { return null }
+    const names = new Set(entries.map((e) => e.name))
+    const isComfy = names.has('main.py') && COMFY_MARKERS.some((m) => names.has(m))
+    if (isComfy) {
+      let python = ''
+      for (const rel of PYTHON_CANDIDATES) {
+        const candidate = join(dir, rel)
+        if (existsSync(candidate)) { python = candidate; break }
+      }
+      candidates.push({
+        workdir: dir,
+        mainPy: join(dir, 'main.py'),
+        python,
+        vramHint: names.has('models') ? 'has-models' : '',
+      })
+    }
+    return entries
+  }
+
+  // 自己先看一眼
+  const entries = await collect(root)
+  if (entries === null) return { candidates: [], checked: 0, error: '目录读不了' }
+
+  // 自己不是 ComfyUI，就再看它的直接子目录
+  let checked = 1
+  if (candidates.length === 0) {
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue
+      if (SCAN_SKIP.has(entry.name)) continue
+      if (entry.name.startsWith('.')) continue
+      await collect(join(root, entry.name))
+      checked++
+      if (candidates.length >= 8) break
+    }
+  }
+  return { candidates, checked }
+}
+/* ------------------------------------------------------------ 路径校验 ---- */
+
+/**
+ * 同步判断某个目录像不像 ComfyUI 安装目录。
+ * 设置页状态栏要区分「已设置路径但路径下没有 ComfyUI」，就得真去看一眼。
+ * 只看 main.py + 标志子目录，一次 readdir 就够（同步版，给 status 用）。
+ */
+function isComfyDirSync(dir) {
+  const target = String(dir ?? '').trim()
+  if (target === '') return false
+  try {
+    if (!existsSync(target)) return false
+    const names = new Set(readdirSync(target))
+    return names.has('main.py') && COMFY_MARKERS.some((m) => names.has(m))
+  } catch {
+    return false
+  }
+}
+/* ------------------------------------------------------------ 目录浏览 ---- */
+
+/**
+ * 列出某个目录下的子目录，供「连接到 ComfyUI」的目录树用。
+ *
+ * path 为空时返回所有磁盘盘符；否则返回该目录的直接子目录。
+ * 每个子目录顺带标出是不是 ComfyUI 安装目录（含 main.py + comfy/custom_nodes 之类），
+ * 前端就能把可疑的候选高亮出来，用户一眼看到该点哪个。
+ */
+async function listChildDirs(target) {
+  const isWindows = process.platform === 'win32'
+
+  // 空路径 = 列出盘符
+  if (target === '') {
+    if (!isWindows) {
+      return { path: '', parent: '', dirs: [{ name: '/', path: '/', isComfy: false }] }
+    }
+    const drives = []
+    // 只试 A-Z 里的常见盘，statSync 一次就知道存不存在，比 wmic 快也不会弹窗
+    for (const letter of 'CDEFGHIJ') {
+      const root = `${letter}:\\`
+      try { if (existsSync(root)) drives.push({ name: `${letter}:`, path: root, isComfy: false }) } catch { /* 无权限，跳过 */ }
+    }
+    return { path: '', parent: '', dirs: drives }
+  }
+
+  const dir = resolve(target)
+  const dirStat = await stat(dir)
+  if (!dirStat.isDirectory()) throw Object.assign(new Error(`不是目录：${dir}`), { code: 'ENOTDIR' })
+
+  const entries = await readdir(dir, { withFileTypes: true })
+  const dirs = []
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    if (entry.name.startsWith('.')) continue
+    const full = join(dir, entry.name)
+    dirs.push({ name: entry.name, path: full, isComfy: false })
+  }
+  // 名字排序：ComfyUI 排前面，其余按字母
+  dirs.sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true }))
+
+  // 标出 ComfyUI 目录：只看 main.py 是否存在 + 有没有标志性子目录，读一次目录就够
+  for (const item of dirs) {
+    try {
+      const sub = await readdir(item.path, { withFileTypes: true })
+      const names = new Set(sub.map((e) => e.name))
+      item.isComfy = names.has('main.py') && COMFY_MARKERS.some((m) => names.has(m))
+      item.hasModels = names.has('models')
+    } catch { /* 读不了就当普通目录 */ }
+  }
+  dirs.sort((a, b) => {
+    if (a.isComfy !== b.isComfy) return a.isComfy ? -1 : 1
+    return a.name.localeCompare(b.name, 'en', { numeric: true })
+  })
+
+  const parent = dirname(dir)
+  return { path: dir, parent: parent === dir ? '' : parent, dirs }
+}
 /* ------------------------------------------------------------ 推荐模型 ---- */
 
 /**
@@ -2126,6 +2256,19 @@ async function generateImageUnlocked(args, exec) {
       // 机器信息与参考图上限（设置页展示用）
       hardware: hardwareCache,
       refLimit: resolveRefLimit(cfg, hardwareCache),
+      // 自动探测到的 ComfyUI 安装位置：设置页顶部状态栏直接显示，用户不用再去填路径
+      comfy: (() => {
+        const workdir = comfyRoot(cfg)
+        return {
+          workdir,
+          mainPy: String(cfg.comfyMainPy ?? '').trim(),
+          python: String(cfg.comfyPython ?? '').trim(),
+          modelsDir: resolveModelsDir(cfg),
+          // 路径写出来了，但里面到底有没有 ComfyUI？状态栏据此区分
+          // 「已关联，等待启动」和「路径下没有 ComfyUI」
+          valid: isComfyDirSync(workdir),
+        }
+      })(),
     })
   }
 
@@ -2158,6 +2301,153 @@ async function generateImageUnlocked(args, exec) {
     }
   }
 
+  /**
+   * 读回一张已生成的图，给设置页「快速出图」显示缩略图用。
+   *
+   * 安全：path 参数先转绝对路径，再和输出目录做 relative 比对。
+   * 只要有 `..` 前缀就拒绝——否则这个路由就变成「读任意本地文件」的洞。
+   * 输出目录本身也允许（rel === '' 时按目录处理，readFile 会报 EISDIR，走 500）。
+   */
+  const onImage = async (req, res) => {
+    if (!isLocalRequest(req)) {
+      respondJson(res, 403, { ok: false, error: '只接受本机请求' })
+      return
+    }
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      res.writeHead(405, { Allow: 'GET, HEAD' })
+      res.end()
+      return
+    }
+    try {
+      const url = new URL(req.url ?? '/', 'http://127.0.0.1')
+      const raw = (url.searchParams.get('path') ?? '').trim()
+      if (raw === '') {
+        respondJson(res, 400, { ok: false, error: 'path 不能为空' })
+        return
+      }
+      const cfg = currentConfig()
+      const root = resolve(resolveOutputDir(cfg))
+      const target = resolve(raw)
+      const rel = relative(root, target)
+      if (rel === '' || rel.startsWith('..')) {
+        respondJson(res, 403, { ok: false, error: '只能读取输出目录里的图片' })
+        return
+      }
+      const buffer = await readFile(target)
+      const dot = target.lastIndexOf('.')
+      const ext = dot >= 0 ? target.slice(dot).toLowerCase() : ''
+      const type = ext === '.jpg' || ext === '.jpeg'
+        ? 'image/jpeg'
+        : ext === '.webp'
+          ? 'image/webp'
+          : 'image/png'
+      res.writeHead(200, {
+        'Content-Type': type,
+        'Content-Length': buffer.length,
+        'Cache-Control': 'no-store',
+      })
+      res.end(req.method === 'HEAD' ? undefined : buffer)
+    } catch (error) {
+      const status = error?.code === 'ENOENT' ? 404 : 500
+      respondJson(res, status, { ok: false, error: error?.message ?? String(error) })
+    }
+  }
+  /**
+   * 在系统文件管理器里定位一张已生成的图。
+   *
+   * 和 image 路由同一套路径校验：只允许输出目录里的文件，避免「打开任意路径」
+   * 被跨站请求利用。Windows 用 explorer /select 顺手选中那个文件；macOS 用
+   * open -R；其余平台退化成打开所在目录。
+   */
+  const onReveal = async (req, res) => {
+    if (!isLocalRequest(req)) {
+      respondJson(res, 403, { ok: false, error: '只接受本机请求' })
+      return
+    }
+    if (req.method !== 'POST') {
+      res.writeHead(405, { Allow: 'POST' })
+      res.end()
+      return
+    }
+    try {
+      const body = await readJsonBody(req)
+      const raw = typeof body?.path === 'string' ? body.path.trim() : ''
+      if (raw === '') {
+        respondJson(res, 400, { ok: false, error: 'path 不能为空' })
+        return
+      }
+      const cfg = currentConfig()
+      const root = resolve(resolveOutputDir(cfg))
+      const target = resolve(raw)
+      const rel = relative(root, target)
+      if (rel === '' || rel.startsWith('..')) {
+        respondJson(res, 403, { ok: false, error: '只能打开输出目录里的图片' })
+        return
+      }
+      if (!existsSync(target)) {
+        respondJson(res, 404, { ok: false, error: '文件不存在，可能已被移走' })
+        return
+      }
+      if (process.platform === 'win32') {
+        // 要「打开文件夹并选中这个文件」，参数必须原样是 /select,"C:\完整路径"。
+        // 默认的 spawn 会给含空格的参数整体套一层引号，拼成
+        // "/select,C:\...\Easy Paint\x.png"（整个带引号），explorer 认不出，
+        // 点了毫无反应。windowsVerbatimArguments 让参数不经 shells 处理直接传过去。
+        spawn('explorer.exe', [`/select,"${target}"`], {
+          detached: true,
+          stdio: 'ignore',
+          windowsVerbatimArguments: true,
+        }).unref()
+      } else if (process.platform === 'darwin') {
+        spawn('open', ['-R', target], { detached: true, stdio: 'ignore' }).unref()
+      } else {
+        spawn('xdg-open', [dirname(target)], { detached: true, stdio: 'ignore' }).unref()
+      }
+      respondJson(res, 200, { ok: true })
+    } catch (error) {
+      respondJson(res, 500, { ok: false, error: error?.message ?? String(error) })
+    }
+  }
+  /**
+   * 打开配置里的输出目录。
+   *
+   * 不接收参数，路径一律取当前配置——这个按钮的语义是「打开我的出图目录」，
+   * 让前端传路径反而多一个可被跨站请求利用的入口。
+   * 目录还没建（一张都没出过）就先建出来，否则资源管理器会弹一个错误框。
+   */
+  const onOpenOutput = async (req, res) => {
+    if (!isLocalRequest(req)) {
+      respondJson(res, 403, { ok: false, error: '只接受本机请求' })
+      return
+    }
+    if (req.method !== 'POST') {
+      res.writeHead(405, { Allow: 'POST' })
+      res.end()
+      return
+    }
+    try {
+      const cfg = currentConfig()
+      const folder = resolve(resolveOutputDir(cfg))
+      // 先回响应，再在后台建目录、拉 explorer。
+      // explorer.exe 冷启动通常要几百毫秒，等它跑完再响应会让按钮一直转圈；
+      // 反正窗口弹出来时请求早就结束了，没必要让前端陪着等。
+      respondJson(res, 200, { ok: true, path: folder })
+      void (async () => {
+        try { await mkdir(folder, { recursive: true }) } catch {}
+        try {
+          if (process.platform === 'win32') {
+            spawn('explorer.exe', [folder], { detached: true, stdio: 'ignore' }).unref()
+          } else if (process.platform === 'darwin') {
+            spawn('open', [folder], { detached: true, stdio: 'ignore' }).unref()
+          } else {
+            spawn('xdg-open', [folder], { detached: true, stdio: 'ignore' }).unref()
+          }
+        } catch {}
+      })()
+    } catch (error) {
+      respondJson(res, 500, { ok: false, error: error?.message ?? String(error) })
+    }
+  }
   const onModels = async (req, res) => {
     if (!isLocalRequest(req)) {
       respondJson(res, 403, { ok: false, error: '只接受本机请求' })
@@ -2603,6 +2893,13 @@ async function generateImageUnlocked(args, exec) {
         body = null
       }
       const customRoot = typeof body?.root === 'string' ? body.root.trim() : ''
+      // shallow: true → 只在这个目录自己 + 直接子目录里找，几毫秒就返回。
+      // 目录树里每点一下都走这条，用户不用等 30 秒深扫。
+      if (body?.shallow === true && customRoot !== '') {
+        const found = await findComfyInDir(customRoot)
+        respondJson(res, 200, { ok: true, ...found })
+        return
+      }
       const result = customRoot === ''
         ? await detectComfyInstallations()
         : await detectInCustomRoot(customRoot)
@@ -2612,6 +2909,28 @@ async function generateImageUnlocked(args, exec) {
     }
   }
 
+  const onBrowse = async (req, res) => {
+    if (!isLocalRequest(req)) {
+      respondJson(res, 403, { ok: false, error: '只接受本机请求' })
+      return
+    }
+    if (req.method !== 'POST') {
+      res.writeHead(405, { Allow: 'POST' })
+      res.end()
+      return
+    }
+    try {
+      let body = null
+      try { body = await readJsonBody(req) } catch { body = null }
+      const target = typeof body?.path === 'string' ? body.path.trim() : ''
+      const result = await listChildDirs(target)
+      respondJson(res, 200, { ok: true, ...result })
+    } catch (error) {
+      const code = error?.code
+      const msg = code === 'ENOENT' ? '目录不存在' : code === 'ENOTDIR' ? '不是目录' : code === 'EACCES' ? '没有访问权限' : (error?.message ?? String(error))
+      respondJson(res, 200, { ok: false, error: msg })
+    }
+  }
   // webServer 是可选服务：没有它的 profile 里插件照常出图，只是设置页读写不了。
   if (typeof ctx.inject === 'function') {
     ctx.inject(['webServer'], (webCtx) => {
@@ -2624,7 +2943,11 @@ async function generateImageUnlocked(args, exec) {
           webCtx.webServer.register({ kind: 'exact', path: STOP_PATH, handler: onStop }),
           webCtx.webServer.register({ kind: 'exact', path: VISION_MODELS_PATH, handler: onVisionModels }),
           webCtx.webServer.register({ kind: 'exact', path: DETECT_PATH, handler: onDetect }),
-    webCtx.webServer.register({ kind: 'exact', path: DRAW_PATH, handler: onDraw }),
+          webCtx.webServer.register({ kind: 'exact', path: BROWSE_PATH, handler: onBrowse }),
+          webCtx.webServer.register({ kind: 'exact', path: DRAW_PATH, handler: onDraw }),
+          webCtx.webServer.register({ kind: 'exact', path: IMAGE_PATH, handler: onImage }),
+          webCtx.webServer.register({ kind: 'exact', path: REVEAL_PATH, handler: onReveal }),
+          webCtx.webServer.register({ kind: 'exact', path: OPEN_OUTPUT_PATH, handler: onOpenOutput }),
         ]
         return () => { for (const dispose of disposers) dispose() }
       }, 'easy-paint: config, status, models, launch, stop and vision-models routes')
