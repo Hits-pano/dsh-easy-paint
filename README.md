@@ -13,6 +13,26 @@
 [![DSH Plugin](https://img.shields.io/badge/DeepSeek%20Harness-plugin-blue.svg)]()
 [![Arch](https://img.shields.io/badge/arch-Qwen--Image%20%7C%20SDXL%20%7C%20Z--Image-8a2be2.svg)]()
 
+---
+
+## 🖥️ 不想开 DSH？有独立版
+
+同一套界面做成了 **Windows 单文件程序**，双击就用，不需要安装 DSH、也不需要装 Node：
+
+**[⬇ 下载 Easy Paint WebUI](https://github.com/Hits-pano/easy-paint-webui/releases/latest)**
+
+| | 插件版（本仓库） | [独立版](https://github.com/Hits-pano/easy-paint-webui) |
+|---|---|---|
+| 需要 DSH | ✅ 需要 | ❌ 不需要 |
+| 形态 | DSH 插件 | 单个 exe（22 MB） |
+| 对话出图 | ✅ 支持 | ❌ 只能在界面里输提示词 |
+| 出图自检 | ✅ 支持 | ❌ 没有 |
+| 其余功能 | 界面、工作流、模型扫描、自动启停 ComfyUI 完全一致 | 同左 |
+
+两边**共用同一份配置**（`~/.dsh/easy-paint/config.json`），装哪个都不影响另一个。
+
+---
+
 > **关于名字**：这个插件最初叫 `Qwen Draw`，只支持 Qwen-Image 一个架构；后来陆续接入 SDXL 和 Z-Image，
 > 名字也跟着改了几次（`qwen-draw-lite` → `dsh-paint-lite` → `dsh-easy-paint`）。
 > 早期提交记录里还留着旧名字，完整演进见 [CHANGELOG](./CHANGELOG.md)。

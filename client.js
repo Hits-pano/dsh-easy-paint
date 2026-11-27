@@ -1588,14 +1588,33 @@ window.__ModuleLoader__.load({
       }
 
 
+      /**
+       * 把自动探测到的 ComfyUI 位置写进配置。
+       *
+       * 不能走 save()：save 开头有 `if (config === null) return`，
+       * 而自动探测在挂载时（config 还没加载完）就跑了，此时 config 仍是 null，
+       * save 静默返回——探测明明找到了，却一个字都没写进去，
+       * 新用户看到的就是「请选择 ComfyUI 路径」。
+       *
+       * 改成一次 POST 带齐字段，不依赖 config 是否就绪。
+       */
       const applyCandidate = React.useCallback(async (candidate) => {
+        const fields = {
+          comfyWorkdir: candidate.workdir,
+          comfyMainPy: candidate.mainPy,
+        }
+        if (candidate.python) fields.comfyPython = candidate.python
         patch('comfyWorkdir', candidate.workdir)
         patch('comfyMainPy', candidate.mainPy)
         if (candidate.python) patch('comfyPython', candidate.python)
-        await save('comfyWorkdir', null, candidate.workdir)
-        await save('comfyMainPy', null, candidate.mainPy)
-        if (candidate.python) await save('comfyPython', null, candidate.python)
-      }, [save])
+        try {
+          const data = await apiPost(API_CONFIG, { config: fields })
+          applySavedConfig(data, { ...(config ?? {}), ...fields })
+          setStatusTick((n) => n + 1)
+        } catch {
+          // 自动探测失败不打扰用户：路径留空，让他自己选
+        }
+      }, [config])
 
       /**
        * 选定一个目录作为 ComfyUI 安装位置：写进配置并立即保存。
@@ -3174,9 +3193,13 @@ const SEAT_STYLE = `
         }
       }, [])
 
-      // 打开时从当前已配置的目录起步；没配置就从盘符开始
+      // 打开时的起始目录：
+      //   已配置 → 从那个目录起步（方便原地改）
+      //   没配置 → 固定从 C 盘根开始。
+      //     不能用「盘符列表」当起点：用户第一次打开看到一堆盘符不知道点哪，
+      //     也不该默认落在任何具体路径上（那是开发机的目录，用户机器上没有）。
       React.useEffect(() => {
-        void load(current !== '' ? current : '')
+        void load(current !== '' ? current : 'C:\\')
         // 只在挂载时跑一次
       }, [])
 

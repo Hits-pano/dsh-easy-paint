@@ -98,9 +98,11 @@ const DEFAULTS = {
   // 出图前若连不上 ComfyUI，就用这三个字段把它拉起来。
   // 默认值按本机 ComfyUI Desktop 的独立 venv 填好，换机器时改掉即可。
   autoStart: true,
-  comfyPython: 'C:\\Software\\ComfyUI\\ComfyUI\\ComfyUI\\.venv\\Scripts\\python.exe',
-  comfyMainPy: 'C:\\Software\\ComfyUI\\ComfyUI\\ComfyUI\\main.py',
-  comfyWorkdir: 'C:\\Software\\ComfyUI\\ComfyUI\\ComfyUI',
+  // 这三个路径不能写死成开发机的路径——用户装的 ComfyUI 位置各不相同。
+  // 留空表示「未配置」，由路径自动检测或目录树填充。
+  comfyPython: '',
+  comfyMainPy: '',
+  comfyWorkdir: '',
   // 模型目录。留空则用 <comfyWorkdir>/models；填了就完全按这个路径找。
   // 填的是 models 目录本身，不是它的父目录。
   modelsDir: '',

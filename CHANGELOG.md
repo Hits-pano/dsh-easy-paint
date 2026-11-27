@@ -21,6 +21,58 @@
 
 ---
 
+## [0.5.1] - 2026-11-27
+
+新用户第一次打开设置页就能用，不用再手动选路径。
+
+### 修复
+
+**自动检测找到了 ComfyUI，却写不进配置**
+
+打开设置页时会自动扫常见位置找 ComfyUI，找不到才让用户手动选。但探测结果
+写不进去——`applyCandidate` 走的是 `save()`，而 `save()` 开头有
+`if (config === null) return`；自动探测在组件挂载时就跑了，那时配置还在加载，
+`config` 仍是 `null`，于是**静默返回，一个字都没写**。
+
+新用户打开看到的就是「请选择 ComfyUI 路径」，明明自动检测已经定位到了。
+
+改成一次 `POST /api/easy-paint/config` 带齐三个字段，不依赖 `config` 是否就绪：
+
+```js
+const fields = { comfyWorkdir, comfyMainPy }
+if (candidate.python) fields.comfyPython = candidate.python
+const data = await apiPost(API_CONFIG, { config: fields })
+```
+
+实测：清空配置启动后打开页面，0.2 秒内自动填好三个路径并落盘，
+状态栏直接从「请选择 ComfyUI 路径」变成「已关联 ComfyUI，等待启动」。
+
+> 这个 bug 在 DSH 里被掩盖了——那边 `config` 的加载时机恰好更早。
+> 做独立版时因为直接挂载组件、时序更紧，才暴露出来。
+
+### 变更
+
+**ComfyUI 路径默认值改为空**
+
+`DEFAULTS` 里原本写死了开发机路径：
+
+```js
+comfyPython:  'C:\\Software\\ComfyUI\\ComfyUI\\ComfyUI\\.venv\\Scripts\\python.exe'
+comfyMainPy:  'C:\\Software\\ComfyUI\\ComfyUI\\ComfyUI\\main.py'
+comfyWorkdir: 'C:\\Software\\ComfyUI\\ComfyUI\\ComfyUI'
+```
+
+别人的 ComfyUI 不在这个位置，装上插件后这些值全是无效路径，而目录树一打开
+就停在我的安装目录——用户机器上根本没有。
+
+三个字段都改成空字符串，表示「未配置」，由自动检测或目录树填充。
+
+**目录树未配置时从 C 盘根目录起步**
+
+没配置过路径时，目录树原本用「盘符列表」当起点，用户看到一堆盘符不知道点哪。
+改成固定从 `C:\` 开始，自己往下点。
+
+已配置的情况不变——仍然从当前目录起步，方便原地修改。
 ## [0.5.0] - 2026-11-27
 
 设置页大幅重做：从「填路径、调参数」的工具，变成能直接出图的完整面板。
