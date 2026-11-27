@@ -80,6 +80,15 @@ dsh plugin add Hits-pano/dsh-easy-paint
 
 出图后由 ComfyUI 直接存到自己的 `output/Easy Paint/` 下，进度看对话框右下角的状态胶囊。
 
+> **关于在对话里看图**
+>
+> 出图后直接把本地路径写成 `![](C:\...)` 是显示不出来的 —— DSH 的 markdown
+> 只认 `http(s)://` 和 `data:`。要让图出现在对话里，需要对路径调用
+> `read_image` 工具。
+>
+> 插件的 `draw_image` 返回里带了这个提示（`displayHint` 字段），模型收到后
+> 会知道该怎么做，不用你操心。
+
 ### 就这三步
 
 剩下的都是可选项：LoRA、参考图、自动重试、视觉自检，按需在设置页打开。
