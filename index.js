@@ -2078,7 +2078,22 @@ async function generateImageUnlocked(args, exec) {
             }
           }
 
-          shots.push({ path: file, seed: workflow.seed, selfCheck, selfCheckSeconds })
+          // 自检没过：把这张图存成附件，让 render 能直接贴在对话里。
+          // render 是同步的、存附件是异步的，所以在这里（还能 await）先备好。
+          let preview = null
+          if (selfCheck.mode !== 'off' && selfCheck.ok === false && checkServices.attachments) {
+            try {
+              const buf = outputBuffer ?? await readFile(file)
+              const refs = await checkServices.attachments.saveImages([{
+                data: buf, mediaType: 'image/png', name: basename(file),
+              }])
+              preview = refs[0] ?? null
+            } catch {
+              // 存附件失败不影响出图，只是这次没法自动贴图
+            }
+          }
+
+          shots.push({ path: file, seed: workflow.seed, selfCheck, selfCheckSeconds, preview })
           // 多张之间留一点间隔，避免把 ComfyUI 队列挤爆
           if (index + 1 < total) await sleep(300)
         }
@@ -2096,6 +2111,8 @@ async function generateImageUnlocked(args, exec) {
           paths: shots.map((shot) => shot.path),
           seeds: shots.map((shot) => shot.seed),
           checks: shots.map((shot) => shot.selfCheck),
+            // 自检未通过那些图的附件引用：render 用它把图贴出来；没有失败项就是 null。
+            previews: shots.map((shot) => shot.preview),
           width: lastWorkflow.width,
           height: lastWorkflow.height,
           steps: lastWorkflow.steps,
@@ -2166,6 +2183,7 @@ async function generateImageUnlocked(args, exec) {
           paths: { type: 'array', items: { type: 'string' } },
           seeds: { type: 'array', items: { type: 'number' } },
           checks: { type: 'array', items: { type: 'object', additionalProperties: true } },
+            previews: { type: 'array', items: { type: ['object', 'null'], additionalProperties: true } },
           width: { type: 'number' },
           height: { type: 'number' },
           steps: { type: 'number' },
@@ -2195,6 +2213,7 @@ async function generateImageUnlocked(args, exec) {
         'paths',
         'seeds',
         'checks',
+          'previews',
         'width',
         'height',
         'steps',
@@ -2212,48 +2231,73 @@ async function generateImageUnlocked(args, exec) {
       },
       render: (_args, value) => {
         // 启动耗时为 0 时不提，避免每次都多一句废话
-        const startup = value.startupSeconds > 0 ? `（其中启动 ComfyUI ${value.startupSeconds}s）` : ''
-        const mode = value.refCount > 0 ? `图生图·${value.refCount} 张参考` : '文生图'
+        const startup = value.startupSeconds > 0 ? '（其中启动 ComfyUI ' + value.startupSeconds + 's）' : ''
+        const mode = value.refCount > 0 ? '图生图·' + value.refCount + ' 张参考' : '文生图'
         // 被上限挡掉的参考图要如实说出来，不能让用户以为都用上了
         const dropped = value.ignoredRefs > 0
-          ? `〔注意：另有 ${value.ignoredRefs} 张参考图被忽略——本机显存上限 ${value.refCount} 张〕`
+          ? '〔注意：另有 ' + value.ignoredRefs + ' 张参考图被忽略——本机显存上限 ' + value.refCount + ' 张〕'
           : ''
-        // 自检结论：off 不提；通过就一句话；不通过把原因列出来
+
+        // 自检结论。failed 单独拿出来：它决定要不要把图贴出来、要不要提醒「别自己重画」
         let checkText = ''
+        let failed = false
         const sc = value.selfCheck
         if (sc && sc.mode !== 'off') {
           const label = sc.mode === 'vision' ? '视觉自检' : '轻量自检'
-          const spent = value.selfCheckSeconds > 0 ? ` ${value.selfCheckSeconds}s` : ''
-          if (sc.skipped) checkText = `〔${label}未完成${spent}：${(sc.issues ?? []).join('；')}〕`
-          else if (sc.ok) checkText = `〔${label}通过${spent}〕`
-          else checkText = `〔${label}未通过${spent}：${(sc.issues ?? []).join('；')}〕`
+          const spent = value.selfCheckSeconds > 0 ? ' ' + value.selfCheckSeconds + 's' : ''
+          const why = (sc.issues ?? []).join('；')
+          if (sc.skipped) {
+            checkText = '〔' + label + '未完成' + spent + '：' + why + '〕'
+          } else if (sc.ok) {
+            checkText = '〔' + label + '通过' + spent + '〕'
+          } else {
+            failed = true
+            checkText = '〔' + label + '未通过' + spent + '：' + why + '〕'
+          }
         }
+
+        // 自检没过 ≠ 该重画。重不重画由用户决定（设置页的自动重试），
+        // 插件这一轮已经出完了。不写清楚这句，模型看到「未通过」就会反复调工具重画。
+        const failedNote = failed
+          ? '〔这张图保留在上面那个路径。插件不会因为你看到「未通过」就自动重画——'
+            + '要不要重画等用户说；想让它固定出几张不同种子，到 DSH 设置 → Easy Paint 调「自动重试」〕'
+          : ''
+
         // 调用方传了已停用的采样参数：明确告诉用户这些被忽略了、该去哪儿改
         const ignoredText = Array.isArray(value.ignoredArgs) && value.ignoredArgs.length > 0
-          ? `〔注意：${value.ignoredArgs.join(' / ')} 参数已忽略——采样设置以设置页为准（当前 ${value.steps} 步 / CFG ${value.cfg} / ${value.width}×${value.height}）。要改请到 DSH 设置 → Easy Paint〕`
+          ? '〔注意：' + value.ignoredArgs.join(' / ') + ' 参数已忽略——采样设置以设置页为准（当前 '
+            + value.steps + ' 步 / CFG ' + value.cfg + ' / ' + value.width + '×' + value.height
+            + '）。要改请到 DSH 设置 → Easy Paint〕'
           : ''
 
         // 多张抽卡：逐张列出路径与自检结论，让用户自己挑
-        const list = Array.isArray(value.paths) && value.paths.length > 1
-          ? value.paths.map((p, i) => {
+        const multi = Array.isArray(value.paths) && value.paths.length > 1
+        const list = multi
+          ? value.paths.map((path, i) => {
             const c = Array.isArray(value.checks) ? value.checks[i] : null
             let tag = ''
             if (c && c.mode !== 'off') tag = c.skipped ? '（自检未完成）' : (c.ok ? '（自检通过）' : '（自检未通过）')
-            return `  ${i + 1}. ${p}　seed ${value.seeds?.[i] ?? '?'}${tag}`
+            return '  ' + (i + 1) + '. ' + path + '　seed ' + (value.seeds?.[i] ?? '?') + tag
           }).join('\n')
           : ''
 
-        if (list !== '') {
-          return [{
-            type: 'text',
-            text: `已出图 ${value.paths.length} 张（${mode}，${value.width}×${value.height}，${value.steps} 步 / CFG ${value.cfg}，共用时 ${value.seconds}s${startup}）：\n${list}\n${dropped}${ignoredText}〔可用上面的路径挑选满意的一张；想改重试次数请到 DSH 设置 → Easy Paint〕`,
-          }]
-        }
+        const head = multi
+          ? '已出图 ' + value.paths.length + ' 张（' + mode + '，' + value.width + '×' + value.height + '，'
+            + value.steps + ' 步 / CFG ' + value.cfg + '，共用时 ' + value.seconds + 's' + startup + '）：\n' + list
+          : '已出图（' + mode + '）：' + value.path + '（' + value.width + '×' + value.height + '，'
+            + value.steps + ' 步 / CFG ' + value.cfg + '，seed ' + value.seed + '，用时 ' + value.seconds + 's' + startup + '）'
 
-        return [{
-          type: 'text',
-          text: `已出图（${mode}）：${value.path}（${value.width}×${value.height}，${value.steps} 步 / CFG ${value.cfg}，seed ${value.seed}，用时 ${value.seconds}s${startup}）${dropped}${ignoredText}${checkText}`,
-        }]
+        const text = [head, dropped, ignoredText, checkText, failedNote].filter((x) => x !== '').join('\n')
+
+        const out = [{ type: 'text', text }]
+
+        // 自检没通过时把图直接贴出来：只有一句「未通过」，用户根本没法判断该不该重画，
+        // 得让他看到画面。previews 是 generateImage 提前存好的附件引用（render 是同步的）。
+        const previews = Array.isArray(value.previews) ? value.previews : []
+        for (const ref of previews) {
+          if (ref) out.push({ type: 'image', attachment: ref })
+        }
+        return out
       },
     },
     isConcurrencySafe: () => false,
